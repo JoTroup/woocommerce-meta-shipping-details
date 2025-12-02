@@ -1,18 +1,25 @@
 <?php
 /**
- * Helper functions.
- *
+ * Base class for plugin helper functions.
  */
-class wact_Base {
+class {plugin_prefix}_Base {
 	/**
-	 * Helper for using prefixes for all references.
+	 * Configuration array for the plugin.
+	 */
+	protected $config = [
+		'prefix' => '{plugin_prefix}',
+		'prefixSeparator' => '_',
+	];
+
+	/**
+	 * Add a prefix to a given name.
 	 */
 	public function setPrefix($name) {
 		return ((strpos($name, $this->config['prefix']) === 0) ? '' : $this->config['prefix']) . $this->config['prefixSeparator'] . $name;
 	}
 
 	/**
-	 * Helper for getting prefixed options.
+	 * Retrieve a prefixed option from the database.
 	 */
 	public function getOption($name, $default = null) {
 		$ret = get_option($this->setPrefix($name));
@@ -23,12 +30,11 @@ class wact_Base {
 	}
 	
 	/**
-	 * Helper for adding/updating prefixed options.
+	 * Add or update a prefixed option in the database.
 	 */
 	public function setOption($name, $value) {
 		return ($this->getOption($name, '') === '') ? 
 			add_option($this->setPrefix($name), $value) : 
 			update_option($this->setPrefix($name), $value);
 	}
-	
 }

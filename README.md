@@ -1,14 +1,14 @@
-# WooCommerce Auto Calculate Total
+# {Plugin Name}
 
 ## Description
 
-The WooCommerce Auto Calculate Total plugin automatically recalculates taxes and totals when saving admin-created orders. This ensures that all order totals are accurate and up-to-date based on the latest WooCommerce tax and calculation settings.
+The {Plugin Name} plugin ensures that {plugin functionality}. This guarantees {plugin benefits}.
 
 ## Features
 
-- Automatically recalculates taxes and totals for admin-created orders.
-- Ensures compliance with WooCommerce tax settings.
-- Lightweight and easy to use.
+- {Feature 1}
+- {Feature 2}
+- {Feature 3}
 
 ## Installation
 
@@ -21,11 +21,11 @@ The WooCommerce Auto Calculate Total plugin automatically recalculates taxes and
 ## Usage
 
 1. After activation, the plugin works automatically.
-2. When an admin saves an order in the WooCommerce admin panel, the plugin recalculates the taxes and totals based on the current WooCommerce settings.
+2. {Usage instructions specific to the plugin}.
 
 ## Support
 
-If you encounter any issues or have questions, please contact us via the plugin's support page.
+For support, visit the plugin's support page.
 
 ## License
 

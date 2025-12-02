@@ -1,21 +1,21 @@
 <?php
 /**
- * Setup functions on activate & deactivate events.
+ * Setup functions for plugin activation and deactivation.
  */
 require_once plugin_dir_path(dirname(__FILE__)) . 'classes/base.php';
 
-class wact_Setup extends wact_Base {
+class {plugin_prefix}_Setup extends {plugin_prefix}_Base {
 	/**
-	 * Specify all codes required for plugin activation here.
+	 * Code to execute on plugin activation.
 	 */
 	public function activate() {
-		$this->debug('[WooCommerce Auto Calculate Total] Activate');
+		$this->debug('[{Plugin Name}] Activate');
 	}
 
 	/**
-	 * Specify all codes required for plugin deactivation here.
+	 * Code to execute on plugin deactivation.
 	 */
 	public function deactivate() {
-		$this->debug('[WooCommerce Auto Calculate Total] Deactivate');
+		$this->debug('[{Plugin Name}] Deactivate');
 	}
 }

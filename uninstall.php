@@ -1,9 +1,7 @@
 <?php
 /**
- * This file is run automatically when the user deletes the plugin.
- * It removes all elements added by the plugin (e.g., custom options, tables, etc.).
- *
- * More information: https://developer.wordpress.org/plugins/plugin-basics/uninstall-methods/
+ * This file is executed automatically when the plugin is deleted.
+ * It removes all plugin-related options and database tables.
  */
 
 if (!defined('WP_UNINSTALL_PLUGIN')) {
@@ -11,15 +9,13 @@ if (!defined('WP_UNINSTALL_PLUGIN')) {
 }
 
 // Remove plugin options
-delete_option('wact_fields'); // Updated option name
-delete_option('wact_options'); // Updated option name
-delete_option('wact_debug_log'); // Updated option name
+delete_option('{plugin_prefix}_fields');
+delete_option('{plugin_prefix}_options');
+delete_option('{plugin_prefix}_debug_log');
+delete_option('{plugin_prefix}_custom_field_1');
+delete_option('{plugin_prefix}_custom_field_2');
 
-// Remove any other custom options added by the plugin
-delete_option('wact_custom_field_1'); // Updated option name
-delete_option('wact_custom_field_2'); // Updated option name
-
-// If the plugin created custom database tables, drop them here
+// Drop custom database tables if created
 // global $wpdb;
-// $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}wact_custom_table"); // Updated table prefix
+// $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}{plugin_prefix}_custom_table");
 
