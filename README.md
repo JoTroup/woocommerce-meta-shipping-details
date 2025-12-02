@@ -1,14 +1,14 @@
-# {Plugin Name}
+# WooCommerce Meta Shipping Details
 
 ## Description
 
-The {Plugin Name} plugin ensures that {plugin functionality}. This guarantees {plugin benefits}.
+The WooCommerce Meta Shipping Details plugin ensures that shipping-related metadata is properly managed and validated for WooCommerce orders.
 
 ## Features
 
-- {Feature 1}
-- {Feature 2}
-- {Feature 3}
+- Automatically validates shipping metadata for orders.
+- Ensures compliance with WooCommerce shipping settings.
+- Lightweight and easy to use.
 
 ## Installation
 
@@ -21,7 +21,7 @@ The {Plugin Name} plugin ensures that {plugin functionality}. This guarantees {p
 ## Usage
 
 1. After activation, the plugin works automatically.
-2. {Usage instructions specific to the plugin}.
+2. When an admin saves an order in the WooCommerce admin panel, the plugin validates and processes shipping metadata.
 
 ## Support
 

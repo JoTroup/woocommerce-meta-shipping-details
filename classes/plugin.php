@@ -5,7 +5,7 @@
  */
 require_once plugin_dir_path(dirname(__FILE__)) . 'classes/setup.php';
 
-class {plugin_prefix}_Plugin extends {plugin_prefix}_Setup {
+class wmsd_Plugin extends wmsd_Setup {
 	public function __construct($config) {
 		$this->config = $config;
 	}

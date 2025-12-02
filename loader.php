@@ -1,12 +1,12 @@
 <?php
 /*
- * Plugin Name:       {Plugin Name}
- * Plugin URI:        {Plugin URI}
- * Description:       {Plugin Description}
- * Version:           {Plugin Version}
- * Author:            {Author Name}
- * Author URI:        {Author URI}
- * Text Domain:       {plugin_text_domain}
+ * Plugin Name:       WooCommerce Meta Shipping Details
+ * Plugin URI:        https://example.com
+ * Description:       Automatically validates and processes shipping metadata for WooCommerce orders.
+ * Version:           1.0.0
+ * Author:            Josiah Troup
+ * Author URI:        https://example.com
+ * Text Domain:       wmsd
  * Domain Path:       /languages
  */
 
@@ -15,7 +15,26 @@ if (!defined('ABSPATH')) {
 	exit;
 }
 
-// Add plugin-specific functionality here
-add_action('woocommerce_process_shop_order_meta', function ($post_id, $post) {
-	// ...plugin-specific code...
-}, 20, 2);
+add_action( 'woocommerce_before_calculate_totals', 'modify_cart', 10, 1);
+
+function modify_cart( $cart_object ) {
+
+    if ( (is_admin() && ! defined( 'DOING_AJAX' ) ) || $cart_object->is_empty() )
+        return;
+
+    foreach ( $cart_object->get_cart() as $cart_item ) {
+
+        $product_id = $cart_item['product_id'];
+
+        $data = get_post_meta( $product_id, 'ccb_calculator'); 
+
+		error_log($data);
+        // $cart_item['data']->set_width( $data['shipping_width'] );
+        // $cart_item['data']->set_height( $data['shipping_width'] );
+        // $cart_item['data']->set_length( $data['shipping_length'] );
+
+        // if( !empty( $cart_item['data']->get_changes() ) )
+        //    $cart_item['data']->apply_changes();
+
+    }
+}

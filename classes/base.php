@@ -2,12 +2,12 @@
 /**
  * Base class for plugin helper functions.
  */
-class {plugin_prefix}_Base {
+class wmsd_Base {
 	/**
 	 * Configuration array for the plugin.
 	 */
 	protected $config = [
-		'prefix' => '{plugin_prefix}',
+		'prefix' => 'wmsd',
 		'prefixSeparator' => '_',
 	];
 

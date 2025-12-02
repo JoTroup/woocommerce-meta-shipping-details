@@ -9,13 +9,13 @@ if (!defined('WP_UNINSTALL_PLUGIN')) {
 }
 
 // Remove plugin options
-delete_option('{plugin_prefix}_fields');
-delete_option('{plugin_prefix}_options');
-delete_option('{plugin_prefix}_debug_log');
-delete_option('{plugin_prefix}_custom_field_1');
-delete_option('{plugin_prefix}_custom_field_2');
+delete_option('wmsd_fields');
+delete_option('wmsd_options');
+delete_option('wmsd_debug_log');
+delete_option('wmsd_custom_field_1');
+delete_option('wmsd_custom_field_2');
 
 // Drop custom database tables if created
 // global $wpdb;
-// $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}{plugin_prefix}_custom_table");
+// $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}wmsd_custom_table");
 
