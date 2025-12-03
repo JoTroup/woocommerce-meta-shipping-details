@@ -26,11 +26,14 @@ function modify_cart( $cart_object ) {
 	error_log("Modifying cart contents: {total items} " . count($cart_object->get_cart()));
 	foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
 		// Log the entire cart item array
-		error_log("Cart Item [$cart_item_key]: " . print_r($cart_item, true));
+		error_log("Cart Item [$cart_item_key]: ");
+		$ccb_calculator = isset($cart_item['ccb_calculator']) ? $cart_item['ccb_calculator'] : null;
+		error_log("Cart Item CCB Calculator [$cart_item_key]: " . print_r($ccb_calculator, true));
+
 
 		// Log cart item data object meta (if needed)
-		if (isset($cart_item['data']) && is_object($cart_item['data'])) {
-			error_log("Cart Item Data [$cart_item_key]: " . print_r($cart_item['data']->get_data(), true));
-		}
+		// if (isset($cart_item['data']) && is_object($cart_item['data'])) {
+		// 	error_log("Cart Item Data [$cart_item_key]: " . print_r($cart_item['data']->get_data(), true));
+		// }
 	}
 }
