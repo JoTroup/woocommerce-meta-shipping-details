@@ -20,7 +20,7 @@ add_action( 'woocommerce_before_checkout_form', 'modify_cart', 10, 1);
 function modify_cart() {
 
 	$cart_object = WC()->cart;
-    if (!$cart || $cart->is_empty()) {
+    if (!$cart_object || $cart_object->is_empty()) {
         return;
     }
 
