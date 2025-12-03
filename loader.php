@@ -15,9 +15,14 @@ if (!defined('ABSPATH')) {
 	exit;
 }
 
-add_action( 'woocommerce_before_calculate_totals', 'modify_cart', 10, 1);
+add_action( 'woocommerce_before_checkout_form', 'modify_cart', 10, 1);
 
-function modify_cart( $cart_object ) {
+function modify_cart() {
+
+	$cart_object = WC()->cart;
+    if (!$cart || $cart->is_empty()) {
+        return;
+    }
 
     if ( (is_admin() && ! defined( 'DOING_AJAX' ) ) || $cart_object->is_empty() )
         return;
@@ -46,7 +51,6 @@ function modify_cart( $cart_object ) {
         	$cart_item['data']->set_width($calc_width);
 			$cart_item['data']->set_length($calc_length);
 			$cart_item['data']->set_weight($calc_weight);
-
 
 			if( !empty( $cart_item['data']->get_changes() ) )
 				error_log( ' - Changes detected in cart item data: ' . print_r( $cart_item['data']->get_changes(), true ) );
