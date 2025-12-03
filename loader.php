@@ -56,7 +56,7 @@ function modify_cart($cart_object) {
 
 				// Overwrite fc_width meta data
 				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
-					$cart_item['data']->update_meta_data('c_width', $calc_width);
+					$cart_item['data']->update_meta_data('pm_width', $calc_width);
 					error_log("Overwrote fc_width for Cart Item [$cart_item_key]");
 				}
 
@@ -73,6 +73,11 @@ function modify_cart($cart_object) {
 				}
 			}
 
+			// Log the calculated dimensions
+			error_log("Calculated dimensions: Height=$calc_height, Width=$calc_width, Length=$calc_length, Weight=$calc_weight");
+			$meta_width = $cart_item['data']->get_meta('pm_width', true); // 'true' for single value
+			error_log("Meta pm_width: $meta_width");
+
 			// Apply changes to ensure they take effect
 			if( !empty( $cart_item['data']->get_changes() ) )
            		$cart_item['data']->apply_changes(); 
@@ -84,7 +89,6 @@ function modify_cart($cart_object) {
 			$length = $cart_item['data']->get_length();
 			$weight = $cart_item['data']->get_weight();
 		
-			error_log("Set on product: Height=$height, Width=$width, Length=$length, Weight=$weight");
 		} else {
 			error_log(" - Calculated dimensions not found in cart item.");
 		}
