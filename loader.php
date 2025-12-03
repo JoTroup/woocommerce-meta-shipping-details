@@ -17,14 +17,9 @@ if (!defined('ABSPATH')) {
 
 add_action( 'woocommerce_before_checkout_form', 'modify_cart', 10, 1);
 
-add_action( 'woocommerce_before_calculate_totals', 'check_cart', 10, 1);
+//add_action( 'woocommerce_before_calculate_totals', 'check_cart', 10, 1);
 
-function modify_cart() {
-
-	$cart_object = WC()->cart;
-    if (!$cart_object || $cart_object->is_empty()) {
-        return;
-    }
+function modify_cart($cart_object) {
 
     if ( (is_admin() && ! defined( 'DOING_AJAX' ) ) || $cart_object->is_empty() )
         return;
