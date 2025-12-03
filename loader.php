@@ -31,13 +31,21 @@ function modify_cart( $cart_object ) {
 		$calc_height = $quantity_field_id_5 = isset($ccb_calculator['calc_data']['quantity_field_id_5']['value']) ? $ccb_calculator['calc_data']['quantity_field_id_5']['value'] : null;
 		$calc_width = $quantity_field_id_4 = isset($ccb_calculator['calc_data']['quantity_field_id_4']['value']) ? $ccb_calculator['calc_data']['quantity_field_id_4']['value'] : null;
 
-		error_log(" - calc_height (quantity_field_id_5): " . print_r($calc_height, true));
-		error_log(" - calc_width (quantity_field_id_4): " . print_r($calc_width, true));
+		if ($calc_height !== null && $calc_width !== null) {
+			// Example modification: Log the calculated dimensions
+			error_log(" - Calculated Height: " . $calc_height);
+			error_log(" - Calculated Width: " . $calc_width);
 
+			$cart_item['data']->set_height($calc_height);
+        	$cart_item['data']->set_width($calc_width);
 
-		// Log cart item data object meta (if needed)
-		// if (isset($cart_item['data']) && is_object($cart_item['data'])) {
-		// 	error_log("Cart Item Data [$cart_item_key]: " . print_r($cart_item['data']->get_data(), true));
-		// }
+			if( !empty( $cart_item['data']->get_changes() ) )
+				error_log( ' - Changes detected in cart item data: ' . print_r( $cart_item['data']->get_changes(), true ) );
+           		$cart_item['data']->apply_changes();
+
+			// You can add more logic here to modify the cart item based on these values
+		} else {
+			error_log(" - Calculated dimensions not found in cart item.");
+		}
 	}
 }
