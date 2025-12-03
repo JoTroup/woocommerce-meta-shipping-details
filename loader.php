@@ -17,6 +17,8 @@ if (!defined('ABSPATH')) {
 
 add_action( 'woocommerce_before_checkout_form', 'modify_cart', 10, 1);
 
+add_action( 'woocommerce_before_calculate_totals', 'check_cart', 10, 1);
+
 function modify_cart() {
 
 	$cart_object = WC()->cart;
@@ -63,5 +65,22 @@ function modify_cart() {
 		} else {
 			error_log(" - Calculated dimensions not found in cart item.");
 		}
+	}
+}
+
+function check_cart ( $cart_object ) {
+	if ( (is_admin() && ! defined( 'DOING_AJAX' ) ) || $cart_object->is_empty() )
+	return;
+
+
+	error_log("Modifying cart contents: {total items} " . count($cart_object->get_cart()));
+	foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
+		// Check and log the values set on the product
+		$height = $cart_item['data']->get_height();
+		$width  = $cart_item['data']->get_width();
+		$length = $cart_item['data']->get_length();
+		$weight = $cart_item['data']->get_weight();
+	
+		error_log("Set on product: Height=$height, Width=$width, Length=$length, Weight=$weight");
 	}
 }
