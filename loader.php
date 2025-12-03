@@ -77,8 +77,12 @@ function modify_cart($cart_object) {
 			error_log("Calculated dimensions: Height=$calc_height, Width=$calc_width, Length=$calc_length, Weight=$calc_weight");
 
 			foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
-				$meta_width = $cart_item['data']->get_meta('pm_width', true); // 'true' for single value
-				error_log("Meta pm_width: $meta_width");
+				$meta_width = $cart_item['data']->get_meta('c_width', true); // 'true' for single value
+				error_log("Meta pm_width: " . $cart_item['data']->get_meta('c_width', true));
+				error_log("Meta pm_length: " . $cart_item['data']->get_meta('c_length', true));
+				error_log("Meta pm_height: " . $cart_item['data']->get_meta('c_height', true));
+				error_log("Meta pm_weight: " . $cart_item['data']->get_meta('c_weight', true));
+			
 			}
 
 
