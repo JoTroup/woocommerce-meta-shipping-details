@@ -46,8 +46,65 @@ function modify_cart($cart_object) {
 			$cart_item['data']->set_length($calc_length);
 			$cart_item['data']->set_weight($calc_weight);
 
+			// fc_height meta data overwrite
+			foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
+				if ( isset( $cart_item['data'] ) && is_object( $cart_item['data'] ) ) {
+					$meta_data = $cart_item['data']->get_meta_data();
+					foreach ( $meta_data as $meta_obj ) {
+						if ( $meta_obj->key === 'fc_height' ) {
+							// Overwrite the value
+							$meta_obj->set_value( $calc_height ); // Set your new value here
+							error_log("Overwrote fc_height for Cart Item [$cart_item_key]");
+						}
+					}
+				}
+			}
+
+			// fc_width meta data overwrite
+			foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
+				if ( isset( $cart_item['data'] ) && is_object( $cart_item['data'] ) ) {
+					$meta_data = $cart_item['data']->get_meta_data();
+					foreach ( $meta_data as $meta_obj ) {
+						if ( $meta_obj->key === 'fc_width' ) {
+							// Overwrite the value
+							$meta_obj->set_value( $calc_width ); // Set your new value here
+							error_log("Overwrote fc_width for Cart Item [$cart_item_key]");
+						}
+					}
+				}
+			}
+
+			// fc_length meta data overwrite
+			foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
+				if ( isset( $cart_item['data'] ) && is_object( $cart_item['data'] ) ) {
+					$meta_data = $cart_item['data']->get_meta_data();
+					foreach ( $meta_data as $meta_obj ) {
+						if ( $meta_obj->key === 'fc_length' ) {
+							// Overwrite the value
+							$meta_obj->set_value( $calc_length ); // Set your new value here
+							error_log("Overwrote fc_length for Cart Item [$cart_item_key]");
+						}
+					}
+				}
+			}
+
+			// fc_weight meta data overwrite
+			foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
+				if ( isset( $cart_item['data'] ) && is_object( $cart_item['data'] ) ) {
+					$meta_data = $cart_item['data']->get_meta_data();
+					foreach ( $meta_data as $meta_obj ) {
+						if ( $meta_obj->key === 'fc_weight' ) {
+							// Overwrite the value
+							$meta_obj->set_value( $calc_weight ); // Set your new value here
+							error_log("Overwrote fc_weight for Cart Item [$cart_item_key]");
+						}
+					}
+				}
+			}
+
+			// Apply changes to ensure they take effect
 			if( !empty( $cart_item['data']->get_changes() ) )
-           		$cart_item['data']->apply_changes();
+           		$cart_item['data']->apply_changes(); 
 
 			
 			// Check and log the values set on the product
