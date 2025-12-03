@@ -22,6 +22,8 @@ function modify_cart( $cart_object ) {
     if ( (is_admin() && ! defined( 'DOING_AJAX' ) ) || $cart_object->is_empty() )
         return;
 
+
+	error_log("Modifying cart contents:");
 	foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
 		// Log the entire cart item array
 		error_log("Cart Item [$cart_item_key]: " . print_r($cart_item, true));
