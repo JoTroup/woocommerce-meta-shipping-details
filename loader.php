@@ -56,7 +56,7 @@ function modify_cart($cart_object) {
 
 				// Overwrite fc_width meta data
 				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
-					$cart_item['data']->update_meta_data('pm_width', $calc_width);
+					$cart_item['data']->update_meta_data('c_width', $calc_width);
 					error_log("Overwrote fc_width for Cart Item [$cart_item_key]");
 				}
 
