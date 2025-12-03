@@ -108,6 +108,12 @@ function modify_cart($cart_object) {
 				error_log("Meta pm_length: " . $cart_item['data']->get_meta('c_length', true));
 				error_log("Meta pm_height: " . $cart_item['data']->get_meta('c_height', true));
 				error_log("Meta pm_weight: " . $cart_item['data']->get_meta('c_weight', true));
+
+				error_log("Meta fc_width: " . $cart_item['data']->get_meta('fc_width', true));
+				error_log("Meta fc_length: " . $cart_item['data']->get_meta('fc_length', true));
+				error_log("Meta fc_height: " . $cart_item['data']->get_meta('fc_height', true));
+				error_log("Meta fc_weight: " . $cart_item['data']->get_meta('fc_weight', true));
+		
 			
 			}
 
