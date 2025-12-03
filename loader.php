@@ -73,6 +73,32 @@ function modify_cart($cart_object) {
 				}
 			}
 
+			foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
+				// Overwrite fc_height meta data
+				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
+					$cart_item['data']->update_meta_data('fc_height', $calc_height);
+					error_log("Overwrote fc_height for Cart Item [$cart_item_key]");
+				}
+
+				// Overwrite fc_width meta data
+				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
+					$cart_item['data']->update_meta_data('fc_width', $calc_width);
+					error_log("Overwrote fc_width for Cart Item [$cart_item_key]");
+				}
+
+				// Overwrite fc_length meta data
+				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
+					$cart_item['data']->update_meta_data('fc_length', $calc_length);
+					error_log("Overwrote fc_length for Cart Item [$cart_item_key]");
+				}
+
+				// Overwrite fc_weight meta data
+				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
+					$cart_item['data']->update_meta_data('fc_weight', $calc_weight);
+					error_log("Overwrote fc_weight for Cart Item [$cart_item_key]");
+				}
+			}
+
 			// Log the calculated dimensions
 			error_log("Calculated dimensions: Height=$calc_height, Width=$calc_width, Length=$calc_length, Weight=$calc_weight");
 
