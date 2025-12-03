@@ -37,13 +37,16 @@ function modify_cart( $cart_object ) {
 
 		$calc_weight = $quantity_field_id_3 = isset($ccb_calculator['calc_data']['quantity_field_id_17']['value']) ? $ccb_calculator['calc_data']['quantity_field_id_17']['value'] : null;
 
-		if ($calc_height !== null && $calc_width !== null) {
+		if ($calc_height !== null && $calc_width !== null && $calc_length !== null && $calc_weight !== null) {
 			// Example modification: Log the calculated dimensions
 			error_log(" - Calculated Height: " . $calc_height);
 			error_log(" - Calculated Width: " . $calc_width);
 
 			$cart_item['data']->set_height($calc_height);
         	$cart_item['data']->set_width($calc_width);
+			$cart_item['data']->set_length($calc_length);
+			$cart_item['data']->set_weight($calc_weight);
+
 
 			if( !empty( $cart_item['data']->get_changes() ) )
 				error_log( ' - Changes detected in cart item data: ' . print_r( $cart_item['data']->get_changes(), true ) );
