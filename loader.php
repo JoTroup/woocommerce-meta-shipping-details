@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
 	exit;
 }
 
-add_action( 'woocommerce_before_checkout_form', 'modify_cart', 10, 1);
+add_action( 'woocommerce_before_calculate_totals', 'modify_cart', 10, 1);
 
 //add_action( 'woocommerce_before_calculate_totals', 'check_cart', 10, 1);
 
