@@ -28,7 +28,7 @@ function modify_cart( $cart_object ) {
 
         $data = get_post_meta( $product_id, 'ccb_calculator'); 
 
-		error_log($data);
+		error_log('$data: ' . print_r( $data, true ) );
         // $cart_item['data']->set_width( $data['shipping_width'] );
         // $cart_item['data']->set_height( $data['shipping_width'] );
         // $cart_item['data']->set_length( $data['shipping_length'] );
