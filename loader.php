@@ -47,7 +47,5 @@ function modify_cart( $cart_object ) {
 		} else {
 			error_log(" - Calculated dimensions not found in cart item.");
 		}
-
-		WC()->cart->calculate_totals();
 	}
 }
