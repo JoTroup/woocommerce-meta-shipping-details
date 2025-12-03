@@ -75,8 +75,12 @@ function modify_cart($cart_object) {
 
 			// Log the calculated dimensions
 			error_log("Calculated dimensions: Height=$calc_height, Width=$calc_width, Length=$calc_length, Weight=$calc_weight");
-			$meta_width = $cart_item['data']->get_meta('pm_width', true); // 'true' for single value
-			error_log("Meta pm_width: $meta_width");
+
+			foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
+				$meta_width = $cart_item['data']->get_meta('pm_width', true); // 'true' for single value
+				error_log("Meta pm_width: $meta_width");
+			}
+
 
 			// Apply changes to ensure they take effect
 			if( !empty( $cart_item['data']->get_changes() ) )
