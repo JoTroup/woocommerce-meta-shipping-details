@@ -40,40 +40,7 @@ function modify_cart($cart_object) {
 		$calc_weight = $quantity_field_id_3 = isset($ccb_calculator['calc_data']['quantity_field_id_17']['value']) ? $ccb_calculator['calc_data']['quantity_field_id_17']['value'] : null;
 
 		if ($calc_height !== null && $calc_width !== null && $calc_length !== null && $calc_weight !== null) {
-			// Example modification: Log the calculated dimensions
-			// $cart_item['data']->set_height($calc_height);
-        	// $cart_item['data']->set_width($calc_width);
-			// $cart_item['data']->set_length($calc_length);
-			// $cart_item['data']->set_weight($calc_weight);
-
-			// fc_height meta data overwrite
-			foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
-				// Overwrite fc_height meta data
-				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
-					$cart_item['data']->update_meta_data('pm_height', $calc_height);
-					error_log("Overwrote fc_height for Cart Item [$cart_item_key]");
-				}
-
-				// Overwrite fc_width meta data
-				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
-					$cart_item['data']->update_meta_data('pm_width', $calc_width);
-					error_log("Overwrote fc_width for Cart Item [$cart_item_key]");
-				}
-
-				// Overwrite fc_length meta data
-				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
-					$cart_item['data']->update_meta_data('pm_length', $calc_length);
-					error_log("Overwrote fc_length for Cart Item [$cart_item_key]");
-				}
-
-				// Overwrite fc_weight meta data
-				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
-					$cart_item['data']->update_meta_data('pm_weight', $calc_weight);
-					error_log("Overwrote fc_weight for Cart Item [$cart_item_key]");
-				}
-			}
-
-
+			
 			/// just for testing to see if we can set both pm_ and fc_ meta data to get plugin to work.
 			foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
 				// Overwrite fc_height meta data
@@ -105,18 +72,10 @@ function modify_cart($cart_object) {
 			error_log("Calculated dimensions: Height=$calc_height, Width=$calc_width, Length=$calc_length, Weight=$calc_weight");
 
 			foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
-				$meta_width = $cart_item['data']->get_meta('c_width', true); // 'true' for single value
-				error_log("Meta pm_width: " . $cart_item['data']->get_meta('c_width', true));
-				error_log("Meta pm_length: " . $cart_item['data']->get_meta('c_length', true));
-				error_log("Meta pm_height: " . $cart_item['data']->get_meta('c_height', true));
-				error_log("Meta pm_weight: " . $cart_item['data']->get_meta('c_weight', true));
-
 				error_log("Meta fc_width: " . $cart_item['data']->get_meta('fc_width', true));
 				error_log("Meta fc_length: " . $cart_item['data']->get_meta('fc_length', true));
 				error_log("Meta fc_height: " . $cart_item['data']->get_meta('fc_height', true));
 				error_log("Meta fc_weight: " . $cart_item['data']->get_meta('fc_weight', true));
-		
-			
 			}
 
 
