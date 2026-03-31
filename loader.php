@@ -2,105 +2,456 @@
 /*
  * Plugin Name:       WooCommerce Meta Shipping Details
  * Plugin URI:        https://example.com
- * Description:       Automatically validates and processes shipping metadata for WooCommerce orders.
- * Version:           1.0.0
+ * Description:       Automatically maps Cost Calculator Builder fields onto WooCommerce product meta during cart calculations.
+ * Version:           1.1.0
  * Author:            Josiah Troup
  * Author URI:        https://example.com
  * Text Domain:       wmsd
  * Domain Path:       /languages
  */
 
-// Prevent direct access to the file
-if (!defined('ABSPATH')) {
+if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-add_action( 'woocommerce_before_calculate_totals', 'modify_cart', 10, 1);
+define( 'WMSD_OPTION_MAPPINGS', 'wmsd_calculator_mappings' );
+define( 'WMSD_ADMIN_SLUG', 'wmsd-field-mappings' );
 
-//add_action( 'woocommerce_before_calculate_totals', 'check_cart', 10, 1);
+add_action( 'woocommerce_before_calculate_totals', 'wmsd_modify_cart', 10, 1 );
+add_action( 'admin_menu', 'wmsd_register_admin_page' );
+add_action( 'admin_post_wmsd_save_mappings', 'wmsd_handle_save_mappings' );
 
-function modify_cart($cart_object) {
+function wmsd_modify_cart( $cart_object ) {
+	if ( ( is_admin() && ! defined( 'DOING_AJAX' ) ) || ! is_object( $cart_object ) || $cart_object->is_empty() ) {
+		return;
+	}
 
-    if ( (is_admin() && ! defined( 'DOING_AJAX' ) ) || $cart_object->is_empty() )
-        return;
+	$mappings = wmsd_get_saved_mappings();
 
+	if ( empty( $mappings ) ) {
+		return;
+	}
 
-	error_log("Modifying cart contents: {total items} " . count($cart_object->get_cart()));
-	foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
-		// Log the entire cart item array
-		error_log("Cart Item [$cart_item_key]: ");
-		$ccb_calculator = isset($cart_item['ccb_calculator']) ? $cart_item['ccb_calculator'] : null;
+	foreach ( $cart_object->get_cart() as $cart_item ) {
+		if ( empty( $cart_item['ccb_calculator'] ) || empty( $cart_item['data'] ) || ! is_object( $cart_item['data'] ) ) {
+			continue;
+		}
 
-		$calc_height = $quantity_field_id_5 = isset($ccb_calculator['calc_data']['quantity_field_id_5']['value']) ? $ccb_calculator['calc_data']['quantity_field_id_5']['value'] : null;
+		$calculator_data = $cart_item['ccb_calculator'];
+		$calculator_id   = wmsd_get_calculator_id_from_cart_item( $calculator_data );
 
-		$calc_width = $quantity_field_id_4 = isset($ccb_calculator['calc_data']['quantity_field_id_4']['value']) ? $ccb_calculator['calc_data']['quantity_field_id_4']['value'] : null;
+		if ( ! $calculator_id || empty( $mappings[ $calculator_id ] ) || empty( $calculator_data['calc_data'] ) || ! is_array( $calculator_data['calc_data'] ) ) {
+			continue;
+		}
 
-		$calc_length = $quantity_field_id_6 = isset($ccb_calculator['calc_data']['quantity_field_id_10']['value']) ? $ccb_calculator['calc_data']['quantity_field_id_10']['value'] : null;
+		$product = $cart_item['data'];
 
-		$calc_weight = $quantity_field_id_3 = isset($ccb_calculator['calc_data']['quantity_field_id_17']['value']) ? $ccb_calculator['calc_data']['quantity_field_id_17']['value'] : null;
+		foreach ( $mappings[ $calculator_id ] as $mapping ) {
+			$field_alias = $mapping['field_alias'];
+			$meta_key    = $mapping['meta_key'];
 
-		if ($calc_height !== null && $calc_width !== null && $calc_length !== null && $calc_weight !== null) {
-			
-			/// just for testing to see if we can set both pm_ and fc_ meta data to get plugin to work.
-			foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
-				// Overwrite fc_height meta data
-				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
-					$cart_item['data']->update_meta_data('pm_height', $calc_height);
-					error_log("Overwrote fc_height for Cart Item [$cart_item_key]");
-				}
-
-				// Overwrite fc_width meta data
-				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
-					$cart_item['data']->update_meta_data('pm_width', $calc_width);
-					error_log("Overwrote fc_width for Cart Item [$cart_item_key]");
-				}
-
-				// Overwrite fc_length meta data
-				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
-					$cart_item['data']->update_meta_data('pm_length', $calc_length);
-					error_log("Overwrote fc_length for Cart Item [$cart_item_key]");
-				}
-
-				// Overwrite fc_weight meta data
-				if (isset($cart_item['data']) && is_object($cart_item['data'])) {
-					$cart_item['data']->update_meta_data('pm_weight', $calc_weight);
-					error_log("Overwrote fc_weight for Cart Item [$cart_item_key]");
-				}
+			if ( empty( $calculator_data['calc_data'][ $field_alias ] ) || '' === $meta_key ) {
+				continue;
 			}
 
-			// Log the calculated dimensions
-			error_log("Calculated dimensions: Height=$calc_height, Width=$calc_width, Length=$calc_length, Weight=$calc_weight");
+			$field_data = $calculator_data['calc_data'][ $field_alias ];
+			$value      = wmsd_extract_mapped_value( $field_data );
 
-			// Apply changes to ensure they take effect
-			if( !empty( $cart_item['data']->get_changes() ) )
-           		$cart_item['data']->apply_changes(); 
+			if ( null === $value ) {
+				continue;
+			}
 
-			
-			// Check and log the values set on the product
-			$height = $cart_item['data']->get_height();
-			$width  = $cart_item['data']->get_width();
-			$length = $cart_item['data']->get_length();
-			$weight = $cart_item['data']->get_weight();
-		
-		} else {
-			error_log(" - Calculated dimensions not found in cart item.");
+			$product->update_meta_data( $meta_key, $value );
+		}
+
+		if ( method_exists( $product, 'get_changes' ) && method_exists( $product, 'apply_changes' ) && ! empty( $product->get_changes() ) ) {
+			$product->apply_changes();
 		}
 	}
 }
 
-function check_cart ( $cart_object ) {
-	if ( (is_admin() && ! defined( 'DOING_AJAX' ) ) || $cart_object->is_empty() )
-	return;
-
-
-	error_log("Modifying cart contents: {total items} " . count($cart_object->get_cart()));
-	foreach ( $cart_object->get_cart() as $cart_item_key => $cart_item ) {
-		// Check and log the values set on the product
-		$height = $cart_item['data']->get_height();
-		$width  = $cart_item['data']->get_width();
-		$length = $cart_item['data']->get_length();
-		$weight = $cart_item['data']->get_weight();
-	
-		error_log("Set on product: Height=$height, Width=$width, Length=$length, Weight=$weight");
+function wmsd_extract_mapped_value( $field_data ) {
+	if ( ! is_array( $field_data ) || ! array_key_exists( 'value', $field_data ) ) {
+		return null;
 	}
+
+	$value = $field_data['value'];
+
+	if ( is_array( $value ) ) {
+		$value = wp_json_encode( $value );
+	}
+
+	if ( is_string( $value ) ) {
+		$value = trim( $value );
+	}
+
+	if ( '' === $value && '0' !== $value && 0 !== $value ) {
+		return null;
+	}
+
+	return $value;
+}
+
+function wmsd_get_calculator_id_from_cart_item( $calculator_data ) {
+	if ( ! empty( $calculator_data['calc_id'] ) ) {
+		return absint( $calculator_data['calc_id'] );
+	}
+
+	if ( empty( $calculator_data['order_id'] ) ) {
+		return 0;
+	}
+
+	static $calculator_ids_by_order = array();
+
+	$order_id = absint( $calculator_data['order_id'] );
+
+	if ( isset( $calculator_ids_by_order[ $order_id ] ) ) {
+		return $calculator_ids_by_order[ $order_id ];
+	}
+
+	$calculator_ids_by_order[ $order_id ] = 0;
+
+	if ( class_exists( '\\cBuilder\\Classes\\Database\\CalcOrders' ) && method_exists( '\\cBuilder\\Classes\\Database\\CalcOrders', 'get_order_full_data_by_id' ) ) {
+		$order = \cBuilder\Classes\Database\CalcOrders::get_order_full_data_by_id( $order_id );
+
+		if ( is_array( $order ) && ! empty( $order['calc_id'] ) ) {
+			$calculator_ids_by_order[ $order_id ] = absint( $order['calc_id'] );
+		}
+	}
+
+	return $calculator_ids_by_order[ $order_id ];
+}
+
+function wmsd_register_admin_page() {
+	add_submenu_page(
+		'woocommerce',
+		__( 'Calculator Field Mapping', 'wmsd' ),
+		__( 'Calculator Mapping', 'wmsd' ),
+		'manage_woocommerce',
+		WMSD_ADMIN_SLUG,
+		'wmsd_render_admin_page'
+	);
+}
+
+function wmsd_render_admin_page() {
+	if ( ! current_user_can( 'manage_woocommerce' ) ) {
+		wp_die( esc_html__( 'You do not have permission to access this page.', 'wmsd' ) );
+	}
+
+	$calculators      = wmsd_get_calculators_with_fields();
+	$calculator_map   = wmsd_build_calculator_map( $calculators );
+	$saved_mappings   = wmsd_get_raw_mappings();
+	$rows             = empty( $saved_mappings ) ? array( array( 'calculator_id' => '', 'field_alias' => '', 'meta_key' => '' ) ) : $saved_mappings;
+	$settings_updated = ! empty( $_GET['settings-updated'] );
+	?>
+	<div class="wrap">
+		<h1><?php echo esc_html__( 'Cost Calculator Builder Field Mapping', 'wmsd' ); ?></h1>
+		<p><?php echo esc_html__( 'Map Cost Calculator Builder fields to WooCommerce product meta keys. These mappings are applied during cart calculation and do not modify the Cost Calculator Builder plugin.', 'wmsd' ); ?></p>
+
+		<?php if ( $settings_updated ) : ?>
+			<div class="notice notice-success is-dismissible"><p><?php echo esc_html__( 'Mappings saved.', 'wmsd' ); ?></p></div>
+		<?php endif; ?>
+
+		<?php if ( empty( $calculators ) ) : ?>
+			<div class="notice notice-warning"><p><?php echo esc_html__( 'No published Cost Calculator Builder calculators were found.', 'wmsd' ); ?></p></div>
+		<?php endif; ?>
+
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<input type="hidden" name="action" value="wmsd_save_mappings">
+			<?php wp_nonce_field( 'wmsd_save_mappings' ); ?>
+
+			<table class="widefat striped" id="wmsd-mapping-table">
+				<thead>
+					<tr>
+						<th style="width: 28%;"><?php echo esc_html__( 'Calculator', 'wmsd' ); ?></th>
+						<th style="width: 32%;"><?php echo esc_html__( 'Source Field', 'wmsd' ); ?></th>
+						<th style="width: 32%;"><?php echo esc_html__( 'Target Product Meta Key', 'wmsd' ); ?></th>
+						<th style="width: 8%;"></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( array_values( $rows ) as $index => $row ) : ?>
+						<?php wmsd_render_mapping_row( $index, $row, $calculator_map ); ?>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+
+			<p>
+				<button type="button" class="button" id="wmsd-add-row"><?php echo esc_html__( 'Add Mapping', 'wmsd' ); ?></button>
+			</p>
+
+			<?php submit_button( __( 'Save Mappings', 'wmsd' ) ); ?>
+		</form>
+	</div>
+
+	<script>
+		(function() {
+			const calculators = <?php echo wp_json_encode( $calculator_map ); ?>;
+			const tableBody = document.querySelector('#wmsd-mapping-table tbody');
+			const addRowButton = document.getElementById('wmsd-add-row');
+			let nextIndex = tableBody.querySelectorAll('tr').length;
+
+			function escapeHtml(value) {
+				return String(value)
+					.replace(/&/g, '&amp;')
+					.replace(/</g, '&lt;')
+					.replace(/>/g, '&gt;')
+					.replace(/"/g, '&quot;')
+					.replace(/'/g, '&#039;');
+			}
+
+			function calculatorOptions(selectedValue) {
+				let options = '<option value="">Select calculator</option>';
+
+				Object.keys(calculators).forEach(function(id) {
+					const selected = String(selectedValue) === String(id) ? ' selected' : '';
+					options += '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(calculators[id].label) + '</option>';
+				});
+
+				return options;
+			}
+
+			function fieldOptions(calculatorId, selectedValue) {
+				let options = '<option value="">Select field</option>';
+				const calculator = calculators[String(calculatorId)];
+
+				if (!calculator || !calculator.fields) {
+					return options;
+				}
+
+				calculator.fields.forEach(function(field) {
+					const selected = String(selectedValue) === String(field.alias) ? ' selected' : '';
+					const label = field.label + ' [' + field.alias + ']';
+					options += '<option value="' + escapeHtml(field.alias) + '"' + selected + '>' + escapeHtml(label) + '</option>';
+				});
+
+				return options;
+			}
+
+			function bindRow(row) {
+				const calculatorSelect = row.querySelector('.wmsd-calculator-select');
+				const fieldSelect = row.querySelector('.wmsd-field-select');
+
+				calculatorSelect.addEventListener('change', function() {
+					fieldSelect.innerHTML = fieldOptions(calculatorSelect.value, '');
+				});
+
+				row.querySelector('.wmsd-remove-row').addEventListener('click', function() {
+					if (tableBody.querySelectorAll('tr').length === 1) {
+						calculatorSelect.value = '';
+						fieldSelect.innerHTML = fieldOptions('', '');
+						row.querySelector('.wmsd-meta-key-input').value = '';
+						return;
+					}
+
+					row.remove();
+				});
+			}
+
+			function createRow(index) {
+				const row = document.createElement('tr');
+				row.innerHTML = ''
+					+ '<td><select class="wmsd-calculator-select" name="mappings[' + index + '][calculator_id]">' + calculatorOptions('') + '</select></td>'
+					+ '<td><select class="wmsd-field-select" name="mappings[' + index + '][field_alias]">' + fieldOptions('', '') + '</select></td>'
+					+ '<td><input class="regular-text wmsd-meta-key-input" type="text" name="mappings[' + index + '][meta_key]" value="" placeholder="pm_height"></td>'
+					+ '<td><button type="button" class="button-link-delete wmsd-remove-row">Remove</button></td>';
+
+				bindRow(row);
+				return row;
+			}
+
+			addRowButton.addEventListener('click', function() {
+				tableBody.appendChild(createRow(nextIndex));
+				nextIndex += 1;
+			});
+
+			tableBody.querySelectorAll('tr').forEach(bindRow);
+		})();
+	</script>
+
+	<style>
+		#wmsd-mapping-table select,
+		#wmsd-mapping-table input {
+			width: 100%;
+		}
+	</style>
+	<?php
+}
+
+function wmsd_render_mapping_row( $index, $row, $calculator_map ) {
+	$calculator_id = isset( $row['calculator_id'] ) ? (string) $row['calculator_id'] : '';
+	$field_alias   = isset( $row['field_alias'] ) ? (string) $row['field_alias'] : '';
+	$meta_key      = isset( $row['meta_key'] ) ? (string) $row['meta_key'] : '';
+	$fields        = isset( $calculator_map[ $calculator_id ]['fields'] ) ? $calculator_map[ $calculator_id ]['fields'] : array();
+	?>
+	<tr>
+		<td>
+			<select class="wmsd-calculator-select" name="mappings[<?php echo esc_attr( $index ); ?>][calculator_id]">
+				<option value=""><?php echo esc_html__( 'Select calculator', 'wmsd' ); ?></option>
+				<?php foreach ( $calculator_map as $id => $calculator ) : ?>
+					<option value="<?php echo esc_attr( $id ); ?>" <?php selected( $calculator_id, (string) $id ); ?>><?php echo esc_html( $calculator['label'] ); ?></option>
+				<?php endforeach; ?>
+			</select>
+		</td>
+		<td>
+			<select class="wmsd-field-select" name="mappings[<?php echo esc_attr( $index ); ?>][field_alias]">
+				<option value=""><?php echo esc_html__( 'Select field', 'wmsd' ); ?></option>
+				<?php foreach ( $fields as $field ) : ?>
+					<option value="<?php echo esc_attr( $field['alias'] ); ?>" <?php selected( $field_alias, $field['alias'] ); ?>><?php echo esc_html( $field['label'] . ' [' . $field['alias'] . ']' ); ?></option>
+				<?php endforeach; ?>
+			</select>
+		</td>
+		<td>
+			<input class="regular-text wmsd-meta-key-input" type="text" name="mappings[<?php echo esc_attr( $index ); ?>][meta_key]" value="<?php echo esc_attr( $meta_key ); ?>" placeholder="pm_height">
+		</td>
+		<td>
+			<button type="button" class="button-link-delete wmsd-remove-row"><?php echo esc_html__( 'Remove', 'wmsd' ); ?></button>
+		</td>
+	</tr>
+	<?php
+}
+
+function wmsd_handle_save_mappings() {
+	if ( ! current_user_can( 'manage_woocommerce' ) ) {
+		wp_die( esc_html__( 'You do not have permission to perform this action.', 'wmsd' ) );
+	}
+
+	check_admin_referer( 'wmsd_save_mappings' );
+
+	$raw_mappings = isset( $_POST['mappings'] ) ? wp_unslash( $_POST['mappings'] ) : array();
+	$mappings     = array();
+
+	if ( is_array( $raw_mappings ) ) {
+		foreach ( $raw_mappings as $mapping ) {
+			$calculator_id = isset( $mapping['calculator_id'] ) ? absint( $mapping['calculator_id'] ) : 0;
+			$field_alias   = isset( $mapping['field_alias'] ) ? sanitize_text_field( $mapping['field_alias'] ) : '';
+			$meta_key      = isset( $mapping['meta_key'] ) ? sanitize_key( $mapping['meta_key'] ) : '';
+
+			if ( ! $calculator_id || '' === $field_alias || '' === $meta_key ) {
+				continue;
+			}
+
+			$mappings[] = array(
+				'calculator_id' => $calculator_id,
+				'field_alias'   => $field_alias,
+				'meta_key'      => $meta_key,
+			);
+		}
+	}
+
+	update_option( WMSD_OPTION_MAPPINGS, $mappings, false );
+
+	wp_safe_redirect(
+		add_query_arg(
+			array(
+				'page'             => WMSD_ADMIN_SLUG,
+				'settings-updated' => '1',
+			),
+			admin_url( 'admin.php' )
+		)
+	);
+	exit;
+}
+
+function wmsd_get_saved_mappings() {
+	$raw_mappings = wmsd_get_raw_mappings();
+	$grouped      = array();
+
+	foreach ( $raw_mappings as $mapping ) {
+		$calculator_id = absint( $mapping['calculator_id'] );
+
+		if ( ! $calculator_id || empty( $mapping['field_alias'] ) || empty( $mapping['meta_key'] ) ) {
+			continue;
+		}
+
+		if ( ! isset( $grouped[ $calculator_id ] ) ) {
+			$grouped[ $calculator_id ] = array();
+		}
+
+		$grouped[ $calculator_id ][] = array(
+			'field_alias' => $mapping['field_alias'],
+			'meta_key'    => $mapping['meta_key'],
+		);
+	}
+
+	return $grouped;
+}
+
+function wmsd_get_raw_mappings() {
+	$mappings = get_option( WMSD_OPTION_MAPPINGS, array() );
+
+	return is_array( $mappings ) ? $mappings : array();
+}
+
+function wmsd_get_calculators_with_fields() {
+	$calculators = array();
+	$posts       = get_posts(
+		array(
+			'post_type'      => 'cost-calc',
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'orderby'        => 'title',
+			'order'          => 'ASC',
+			'fields'         => 'ids',
+		)
+	);
+
+	foreach ( $posts as $calculator_id ) {
+		$label  = get_post_meta( $calculator_id, 'stm-name', true );
+		$fields = get_post_meta( $calculator_id, 'stm-fields', true );
+
+		$calculators[] = array(
+			'id'     => (int) $calculator_id,
+			'label'  => $label ? $label : get_the_title( $calculator_id ),
+			'fields' => wmsd_extract_calculator_fields( is_array( $fields ) ? $fields : array() ),
+		);
+	}
+
+	return $calculators;
+}
+
+function wmsd_build_calculator_map( $calculators ) {
+	$map = array();
+
+	foreach ( $calculators as $calculator ) {
+		$map[ (string) $calculator['id'] ] = array(
+			'label'  => $calculator['label'],
+			'fields' => $calculator['fields'],
+		);
+	}
+
+	return $map;
+}
+
+function wmsd_extract_calculator_fields( $fields ) {
+	$extracted = array();
+	$seen      = array();
+
+	$walk = function( $items ) use ( &$walk, &$extracted, &$seen ) {
+		foreach ( $items as $field ) {
+			if ( ! is_array( $field ) ) {
+				continue;
+			}
+
+			if ( ! empty( $field['alias'] ) && ! isset( $seen[ $field['alias'] ] ) ) {
+				$seen[ $field['alias'] ] = true;
+				$extracted[]             = array(
+					'alias' => $field['alias'],
+					'label' => ! empty( $field['label'] ) ? $field['label'] : ( ! empty( $field['text'] ) ? $field['text'] : $field['alias'] ),
+				);
+			}
+
+			if ( ! empty( $field['groupElements'] ) && is_array( $field['groupElements'] ) ) {
+				$walk( $field['groupElements'] );
+			}
+
+			if ( ! empty( $field['fields'] ) && is_array( $field['fields'] ) ) {
+				$walk( $field['fields'] );
+			}
+		}
+	};
+
+	$walk( $fields );
+
+	return $extracted;
 }

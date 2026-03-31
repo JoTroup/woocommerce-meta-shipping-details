@@ -2,13 +2,14 @@
 
 ## Description
 
-The WooCommerce Meta Shipping Details plugin ensures that shipping-related metadata is properly managed and validated for WooCommerce orders.
+The WooCommerce Meta Shipping Details plugin maps Cost Calculator Builder field values onto WooCommerce product meta during cart calculation.
 
 ## Features
 
-- Automatically validates shipping metadata for orders.
-- Ensures compliance with WooCommerce shipping settings.
-- Lightweight and easy to use.
+- Adds an admin page under WooCommerce for calculator-to-meta mapping.
+- Reads available calculators and field aliases from Cost Calculator Builder without modifying that plugin.
+- Supports multiple mappings across multiple calculators.
+- Updates WooCommerce product meta on in-cart product objects during cart calculation.
 
 ## Installation
 
@@ -20,8 +21,10 @@ The WooCommerce Meta Shipping Details plugin ensures that shipping-related metad
 
 ## Usage
 
-1. After activation, the plugin works automatically.
-2. When an admin saves an order in the WooCommerce admin panel, the plugin validates and processes shipping metadata.
+1. Go to WooCommerce > Calculator Mapping.
+2. Add one or more mappings that connect a calculator field to a WooCommerce product meta key.
+3. Save the mappings.
+4. When a mapped calculator adds a product to the cart, the selected field values are copied to the configured product meta keys for that cart item.
 
 ## Support
 
