@@ -49,14 +49,22 @@ function wmsd_refresh_cart_meta_before_package_rates( $package, $shipping_method
 
 function wmsd_modify_cart( $cart_object ) {
 	if ( ( is_admin() && ! defined( 'DOING_AJAX' ) ) || ! is_object( $cart_object ) || $cart_object->is_empty() ) {
+		if ( function_exists( 'WC' ) && WC()->session ) {
+			WC()->session->__unset( 'wmsd_meta_overrides' );
+		}
 		return;
 	}
 
 	$mappings = wmsd_get_saved_mappings();
 
 	if ( empty( $mappings ) ) {
+		if ( function_exists( 'WC' ) && WC()->session ) {
+			WC()->session->__unset( 'wmsd_meta_overrides' );
+		}
 		return;
 	}
+
+	$session_overrides = array();
 
 	foreach ( $cart_object->get_cart() as $cart_item ) {
 		if ( empty( $cart_item['ccb_calculator'] ) || empty( $cart_item['data'] ) || ! is_object( $cart_item['data'] ) ) {
@@ -101,6 +109,14 @@ function wmsd_modify_cart( $cart_object ) {
 
 			$product->update_meta_data( $meta_key, $value );
 
+			foreach ( $product_ids as $mapped_product_id ) {
+				if ( ! isset( $session_overrides[ $mapped_product_id ] ) ) {
+					$session_overrides[ $mapped_product_id ] = array();
+				}
+
+				$session_overrides[ $mapped_product_id ][ $meta_key ] = $value;
+			}
+
 			wmsd_log(
 				'Mapped cart value onto product meta',
 				array(
@@ -118,6 +134,17 @@ function wmsd_modify_cart( $cart_object ) {
 			$product->apply_changes();
 		}
 	}
+
+	if ( function_exists( 'WC' ) && WC()->session ) {
+		WC()->session->set( 'wmsd_meta_overrides', $session_overrides );
+	}
+
+	wmsd_log(
+		'Stored session meta overrides for quote requests',
+		array(
+			'overrides' => $session_overrides,
+		)
+	);
 }
 
 function wmsd_extract_mapped_value( $field_data ) {
