@@ -187,17 +187,13 @@ function wmsd_early_populate_overrides_from_cart() {
 		}
 	}
 
-	// Clear WC product object cache for each overridden product so that the next
-	// new \WC_Product( $id ) call (in checkingQuotes) is forced to re-read meta from
-	// DB, which fires our woocommerce_post_get_meta_data filter below.
-	foreach ( array_keys( $GLOBALS['wmsd_all_overrides'] ) as $pid ) {
-		wp_cache_delete( $pid, 'products' );
-		wp_cache_delete( 'product-' . $pid, 'products' );
-		if ( class_exists( 'WC_Cache_Helper' ) && method_exists( 'WC_Cache_Helper', 'get_cache_prefix' ) ) {
-			wp_cache_delete(
-				WC_Cache_Helper::get_cache_prefix( 'products' ) . 'woocommerce_product_' . $pid,
-				'products'
-			);
+	// WC_Data::read_meta_data() caches loaded meta under this exact key format.
+	// Deleting it forces a fresh $wpdb read on the next new \WC_Product($id) call,
+	// which fires woocommerce_post_get_meta_data where we inject our overrides.
+	if ( class_exists( 'WC_Cache_Helper' ) ) {
+		$prefix = WC_Cache_Helper::get_cache_prefix( 'products' );
+		foreach ( array_keys( $GLOBALS['wmsd_all_overrides'] ) as $pid ) {
+			wp_cache_delete( $prefix . 'object_' . $pid, 'products' );
 		}
 	}
 
