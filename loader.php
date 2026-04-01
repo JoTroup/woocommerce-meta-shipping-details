@@ -22,8 +22,30 @@ if ( ! defined( 'WMSD_DEBUG' ) ) {
 }
 
 add_action( 'woocommerce_before_calculate_totals', 'wmsd_modify_cart', 10, 1 );
+add_action( 'woocommerce_checkout_update_order_review', 'wmsd_refresh_cart_meta_before_checkout_quotes', 1 );
+add_action( 'woocommerce_before_get_rates_for_package', 'wmsd_refresh_cart_meta_before_package_rates', 1, 2 );
 add_action( 'admin_menu', 'wmsd_register_admin_page' );
 add_action( 'admin_post_wmsd_save_mappings', 'wmsd_handle_save_mappings' );
+
+function wmsd_refresh_cart_meta_before_checkout_quotes() {
+	if ( ! WC()->cart || WC()->cart->is_empty() ) {
+		return;
+	}
+
+	wmsd_log( 'Refreshing mapped cart meta before checkout quote update hook' );
+	wmsd_modify_cart( WC()->cart );
+}
+
+function wmsd_refresh_cart_meta_before_package_rates( $package, $shipping_method ) {
+	unset( $package, $shipping_method );
+
+	if ( ! WC()->cart || WC()->cart->is_empty() ) {
+		return;
+	}
+
+	wmsd_log( 'Refreshing mapped cart meta before package rate calculation' );
+	wmsd_modify_cart( WC()->cart );
+}
 
 function wmsd_modify_cart( $cart_object ) {
 	if ( ( is_admin() && ! defined( 'DOING_AJAX' ) ) || ! is_object( $cart_object ) || $cart_object->is_empty() ) {
