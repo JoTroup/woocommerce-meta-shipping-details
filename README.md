@@ -6,9 +6,10 @@ The WooCommerce Meta Shipping Details plugin maps Cost Calculator Builder field 
 
 ## Features
 
-- Adds an admin page under WooCommerce for calculator-to-meta mapping.
+- Adds an admin page under WooCommerce for calculator-to-product-meta mapping.
 - Reads available calculators and field aliases from Cost Calculator Builder without modifying that plugin.
-- Supports multiple mappings across multiple calculators.
+- Lets you choose a WooCommerce product and then select from that product's existing meta keys.
+- Supports multiple mappings across multiple calculators and products.
 - Updates WooCommerce product meta on in-cart product objects during cart calculation.
 
 ## Installation
@@ -22,7 +23,7 @@ The WooCommerce Meta Shipping Details plugin maps Cost Calculator Builder field 
 ## Usage
 
 1. Go to WooCommerce > Calculator Mapping.
-2. Add one or more mappings that connect a calculator field to a WooCommerce product meta key.
+2. Add one or more mappings that connect a calculator field to a WooCommerce product and one of that product's meta keys.
 3. Save the mappings.
 4. When a mapped calculator adds a product to the cart, the selected field values are copied to the configured product meta keys for that cart item.
 

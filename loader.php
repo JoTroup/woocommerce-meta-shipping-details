@@ -45,10 +45,21 @@ function wmsd_modify_cart( $cart_object ) {
 		}
 
 		$product = $cart_item['data'];
+		$product_ids = array_filter(
+			array(
+				method_exists( $product, 'get_id' ) ? absint( $product->get_id() ) : 0,
+				method_exists( $product, 'get_parent_id' ) ? absint( $product->get_parent_id() ) : 0,
+			)
+		);
 
 		foreach ( $mappings[ $calculator_id ] as $mapping ) {
 			$field_alias = $mapping['field_alias'];
+			$product_id  = isset( $mapping['product_id'] ) ? absint( $mapping['product_id'] ) : 0;
 			$meta_key    = $mapping['meta_key'];
+
+			if ( $product_id && ! in_array( $product_id, $product_ids, true ) ) {
+				continue;
+			}
 
 			if ( empty( $calculator_data['calc_data'][ $field_alias ] ) || '' === $meta_key ) {
 				continue;
@@ -140,13 +151,15 @@ function wmsd_render_admin_page() {
 
 	$calculators      = wmsd_get_calculators_with_fields();
 	$calculator_map   = wmsd_build_calculator_map( $calculators );
+	$products         = wmsd_get_products_with_meta_keys();
+	$product_map      = wmsd_build_product_map( $products );
 	$saved_mappings   = wmsd_get_raw_mappings();
-	$rows             = empty( $saved_mappings ) ? array( array( 'calculator_id' => '', 'field_alias' => '', 'meta_key' => '' ) ) : $saved_mappings;
+	$rows             = empty( $saved_mappings ) ? array( array( 'calculator_id' => '', 'field_alias' => '', 'product_id' => '', 'meta_key' => '' ) ) : $saved_mappings;
 	$settings_updated = ! empty( $_GET['settings-updated'] );
 	?>
 	<div class="wrap">
 		<h1><?php echo esc_html__( 'Cost Calculator Builder Field Mapping', 'wmsd' ); ?></h1>
-		<p><?php echo esc_html__( 'Map Cost Calculator Builder fields to WooCommerce product meta keys. These mappings are applied during cart calculation and do not modify the Cost Calculator Builder plugin.', 'wmsd' ); ?></p>
+		<p><?php echo esc_html__( 'Map Cost Calculator Builder fields to WooCommerce product meta keys. Each mapping can target a specific product, and these mappings are applied during cart calculation without modifying the Cost Calculator Builder plugin.', 'wmsd' ); ?></p>
 
 		<?php if ( $settings_updated ) : ?>
 			<div class="notice notice-success is-dismissible"><p><?php echo esc_html__( 'Mappings saved.', 'wmsd' ); ?></p></div>
@@ -156,6 +169,10 @@ function wmsd_render_admin_page() {
 			<div class="notice notice-warning"><p><?php echo esc_html__( 'No published Cost Calculator Builder calculators were found.', 'wmsd' ); ?></p></div>
 		<?php endif; ?>
 
+		<?php if ( empty( $products ) ) : ?>
+			<div class="notice notice-warning"><p><?php echo esc_html__( 'No published WooCommerce products were found.', 'wmsd' ); ?></p></div>
+		<?php endif; ?>
+
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="wmsd_save_mappings">
 			<?php wp_nonce_field( 'wmsd_save_mappings' ); ?>
@@ -163,15 +180,16 @@ function wmsd_render_admin_page() {
 			<table class="widefat striped" id="wmsd-mapping-table">
 				<thead>
 					<tr>
-						<th style="width: 28%;"><?php echo esc_html__( 'Calculator', 'wmsd' ); ?></th>
-						<th style="width: 32%;"><?php echo esc_html__( 'Source Field', 'wmsd' ); ?></th>
-						<th style="width: 32%;"><?php echo esc_html__( 'Target Product Meta Key', 'wmsd' ); ?></th>
+						<th style="width: 22%;"><?php echo esc_html__( 'Calculator', 'wmsd' ); ?></th>
+						<th style="width: 24%;"><?php echo esc_html__( 'Source Field', 'wmsd' ); ?></th>
+						<th style="width: 22%;"><?php echo esc_html__( 'Product', 'wmsd' ); ?></th>
+						<th style="width: 24%;"><?php echo esc_html__( 'Target Product Meta Key', 'wmsd' ); ?></th>
 						<th style="width: 8%;"></th>
 					</tr>
 				</thead>
 				<tbody>
 					<?php foreach ( array_values( $rows ) as $index => $row ) : ?>
-						<?php wmsd_render_mapping_row( $index, $row, $calculator_map ); ?>
+						<?php wmsd_render_mapping_row( $index, $row, $calculator_map, $product_map ); ?>
 					<?php endforeach; ?>
 				</tbody>
 			</table>
@@ -187,6 +205,7 @@ function wmsd_render_admin_page() {
 	<script>
 		(function() {
 			const calculators = <?php echo wp_json_encode( $calculator_map ); ?>;
+			const products = <?php echo wp_json_encode( $product_map ); ?>;
 			const tableBody = document.querySelector('#wmsd-mapping-table tbody');
 			const addRowButton = document.getElementById('wmsd-add-row');
 			let nextIndex = tableBody.querySelectorAll('tr').length;
@@ -228,19 +247,54 @@ function wmsd_render_admin_page() {
 				return options;
 			}
 
+			function productOptions(selectedValue) {
+				let options = '<option value="">Select product</option>';
+
+				Object.keys(products).forEach(function(id) {
+					const selected = String(selectedValue) === String(id) ? ' selected' : '';
+					options += '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(products[id].label) + '</option>';
+				});
+
+				return options;
+			}
+
+			function metaKeyOptions(productId, selectedValue) {
+				let options = '<option value="">Select meta key</option>';
+				const product = products[String(productId)];
+				const metaKeys = product && Array.isArray(product.meta_keys) ? product.meta_keys : [];
+
+				metaKeys.forEach(function(metaKey) {
+					const selected = String(selectedValue) === String(metaKey) ? ' selected' : '';
+					options += '<option value="' + escapeHtml(metaKey) + '"' + selected + '>' + escapeHtml(metaKey) + '</option>';
+				});
+
+				if (selectedValue && !metaKeys.includes(String(selectedValue))) {
+					options += '<option value="' + escapeHtml(selectedValue) + '" selected>' + escapeHtml(selectedValue) + '</option>';
+				}
+
+				return options;
+			}
+
 			function bindRow(row) {
 				const calculatorSelect = row.querySelector('.wmsd-calculator-select');
 				const fieldSelect = row.querySelector('.wmsd-field-select');
+				const productSelect = row.querySelector('.wmsd-product-select');
+				const metaKeySelect = row.querySelector('.wmsd-meta-key-select');
 
 				calculatorSelect.addEventListener('change', function() {
 					fieldSelect.innerHTML = fieldOptions(calculatorSelect.value, '');
+				});
+
+				productSelect.addEventListener('change', function() {
+					metaKeySelect.innerHTML = metaKeyOptions(productSelect.value, '');
 				});
 
 				row.querySelector('.wmsd-remove-row').addEventListener('click', function() {
 					if (tableBody.querySelectorAll('tr').length === 1) {
 						calculatorSelect.value = '';
 						fieldSelect.innerHTML = fieldOptions('', '');
-						row.querySelector('.wmsd-meta-key-input').value = '';
+						productSelect.value = '';
+						metaKeySelect.innerHTML = metaKeyOptions('', '');
 						return;
 					}
 
@@ -253,7 +307,8 @@ function wmsd_render_admin_page() {
 				row.innerHTML = ''
 					+ '<td><select class="wmsd-calculator-select" name="mappings[' + index + '][calculator_id]">' + calculatorOptions('') + '</select></td>'
 					+ '<td><select class="wmsd-field-select" name="mappings[' + index + '][field_alias]">' + fieldOptions('', '') + '</select></td>'
-					+ '<td><input class="regular-text wmsd-meta-key-input" type="text" name="mappings[' + index + '][meta_key]" value="" placeholder="pm_height"></td>'
+					+ '<td><select class="wmsd-product-select" name="mappings[' + index + '][product_id]">' + productOptions('') + '</select></td>'
+					+ '<td><select class="wmsd-meta-key-select" name="mappings[' + index + '][meta_key]">' + metaKeyOptions('', '') + '</select></td>'
 					+ '<td><button type="button" class="button-link-delete wmsd-remove-row">Remove</button></td>';
 
 				bindRow(row);
@@ -278,11 +333,18 @@ function wmsd_render_admin_page() {
 	<?php
 }
 
-function wmsd_render_mapping_row( $index, $row, $calculator_map ) {
+
+function wmsd_render_mapping_row( $index, $row, $calculator_map, $product_map ) {
 	$calculator_id = isset( $row['calculator_id'] ) ? (string) $row['calculator_id'] : '';
 	$field_alias   = isset( $row['field_alias'] ) ? (string) $row['field_alias'] : '';
+	$product_id    = isset( $row['product_id'] ) ? (string) $row['product_id'] : '';
 	$meta_key      = isset( $row['meta_key'] ) ? (string) $row['meta_key'] : '';
 	$fields        = isset( $calculator_map[ $calculator_id ]['fields'] ) ? $calculator_map[ $calculator_id ]['fields'] : array();
+	$meta_keys     = isset( $product_map[ $product_id ]['meta_keys'] ) ? $product_map[ $product_id ]['meta_keys'] : array();
+
+	if ( '' !== $meta_key && ! in_array( $meta_key, $meta_keys, true ) ) {
+		$meta_keys[] = $meta_key;
+	}
 	?>
 	<tr>
 		<td>
@@ -302,7 +364,20 @@ function wmsd_render_mapping_row( $index, $row, $calculator_map ) {
 			</select>
 		</td>
 		<td>
-			<input class="regular-text wmsd-meta-key-input" type="text" name="mappings[<?php echo esc_attr( $index ); ?>][meta_key]" value="<?php echo esc_attr( $meta_key ); ?>" placeholder="pm_height">
+			<select class="wmsd-product-select" name="mappings[<?php echo esc_attr( $index ); ?>][product_id]">
+				<option value=""><?php echo esc_html__( 'Select product', 'wmsd' ); ?></option>
+				<?php foreach ( $product_map as $id => $product ) : ?>
+					<option value="<?php echo esc_attr( $id ); ?>" <?php selected( $product_id, (string) $id ); ?>><?php echo esc_html( $product['label'] ); ?></option>
+				<?php endforeach; ?>
+			</select>
+		</td>
+		<td>
+			<select class="wmsd-meta-key-select" name="mappings[<?php echo esc_attr( $index ); ?>][meta_key]">
+				<option value=""><?php echo esc_html__( 'Select meta key', 'wmsd' ); ?></option>
+				<?php foreach ( $meta_keys as $available_meta_key ) : ?>
+					<option value="<?php echo esc_attr( $available_meta_key ); ?>" <?php selected( $meta_key, $available_meta_key ); ?>><?php echo esc_html( $available_meta_key ); ?></option>
+				<?php endforeach; ?>
+			</select>
 		</td>
 		<td>
 			<button type="button" class="button-link-delete wmsd-remove-row"><?php echo esc_html__( 'Remove', 'wmsd' ); ?></button>
@@ -325,15 +400,17 @@ function wmsd_handle_save_mappings() {
 		foreach ( $raw_mappings as $mapping ) {
 			$calculator_id = isset( $mapping['calculator_id'] ) ? absint( $mapping['calculator_id'] ) : 0;
 			$field_alias   = isset( $mapping['field_alias'] ) ? sanitize_text_field( $mapping['field_alias'] ) : '';
+			$product_id    = isset( $mapping['product_id'] ) ? absint( $mapping['product_id'] ) : 0;
 			$meta_key      = isset( $mapping['meta_key'] ) ? sanitize_key( $mapping['meta_key'] ) : '';
 
-			if ( ! $calculator_id || '' === $field_alias || '' === $meta_key ) {
+			if ( ! $calculator_id || ! $product_id || '' === $field_alias || '' === $meta_key ) {
 				continue;
 			}
 
 			$mappings[] = array(
 				'calculator_id' => $calculator_id,
 				'field_alias'   => $field_alias,
+				'product_id'    => $product_id,
 				'meta_key'      => $meta_key,
 			);
 		}
@@ -370,6 +447,7 @@ function wmsd_get_saved_mappings() {
 
 		$grouped[ $calculator_id ][] = array(
 			'field_alias' => $mapping['field_alias'],
+			'product_id'  => isset( $mapping['product_id'] ) ? absint( $mapping['product_id'] ) : 0,
 			'meta_key'    => $mapping['meta_key'],
 		);
 	}
@@ -421,6 +499,81 @@ function wmsd_build_calculator_map( $calculators ) {
 	}
 
 	return $map;
+}
+
+function wmsd_get_products_with_meta_keys() {
+	$products = array();
+	$posts    = get_posts(
+		array(
+			'post_type'      => 'product',
+			'post_status'    => array( 'publish', 'private' ),
+			'posts_per_page' => -1,
+			'orderby'        => 'title',
+			'order'          => 'ASC',
+			'fields'         => 'ids',
+		)
+	);
+
+	foreach ( $posts as $product_id ) {
+		$products[] = array(
+			'id'        => (int) $product_id,
+			'label'     => wmsd_get_product_label( $product_id ),
+			'meta_keys' => wmsd_get_product_meta_keys( $product_id ),
+		);
+	}
+
+	return $products;
+}
+
+function wmsd_build_product_map( $products ) {
+	$map = array();
+
+	foreach ( $products as $product ) {
+		$map[ (string) $product['id'] ] = array(
+			'label'     => $product['label'],
+			'meta_keys' => $product['meta_keys'],
+		);
+	}
+
+	return $map;
+}
+
+function wmsd_get_product_label( $product_id ) {
+	$title = get_the_title( $product_id );
+	$type  = 'product_variation' === get_post_type( $product_id ) ? __( 'Variation', 'wmsd' ) : __( 'Product', 'wmsd' );
+
+	if ( '' === $title ) {
+		$title = sprintf( __( 'Untitled #%d', 'wmsd' ), $product_id );
+	}
+
+	return sprintf( '%s #%d (%s)', $title, $product_id, $type );
+}
+
+function wmsd_get_product_meta_keys( $product_id ) {
+	$meta       = get_post_meta( $product_id );
+	$meta_keys  = array();
+	$skip_keys  = array( '_edit_last', '_edit_lock' );
+
+	if ( ! is_array( $meta ) ) {
+		return $meta_keys;
+	}
+
+	foreach ( array_keys( $meta ) as $meta_key ) {
+		if ( ! is_string( $meta_key ) || '' === $meta_key || in_array( $meta_key, $skip_keys, true ) ) {
+			continue;
+		}
+
+		if ( 0 === strpos( $meta_key, '_' ) ) {
+			continue;
+		}
+
+		$meta_keys[] = $meta_key;
+	}
+
+	$meta_keys = array_values( array_unique( $meta_keys ) );
+	natcasesort( $meta_keys );
+
+	return array_values( $meta_keys );
 }
 
 function wmsd_extract_calculator_fields( $fields ) {
