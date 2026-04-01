@@ -136,7 +136,28 @@ function wmsd_modify_cart( $cart_object ) {
 	}
 
 	if ( function_exists( 'WC' ) && WC()->session ) {
-		WC()->session->set( 'wmsd_meta_overrides', $session_overrides );
+		$session        = WC()->session;
+		$current_hash   = md5( wp_json_encode( $session_overrides ) );
+		$previous_hash  = (string) $session->get( 'wmsd_meta_overrides_hash', '' );
+
+		$session->set( 'wmsd_meta_overrides', $session_overrides );
+		$session->set( 'wmsd_meta_overrides_hash', $current_hash );
+
+		if ( $current_hash !== $previous_hash ) {
+			// Force Fast Courier to request a fresh quote whenever mapped dimensions change.
+			$session->set( 'fc_api_called_on_checkout', false );
+			$session->__unset( 'quote' );
+			$session->__unset( 'packages_for_quote' );
+			$session->__unset( 'fc_last_shipping_hash' );
+
+			wmsd_log(
+				'Reset Fast Courier quote cache due to mapped override change',
+				array(
+					'previous_hash' => $previous_hash,
+					'current_hash'  => $current_hash,
+				)
+			);
+		}
 	}
 
 	wmsd_log(
