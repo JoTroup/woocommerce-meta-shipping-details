@@ -21,6 +21,7 @@ if ( ! defined( 'WMSD_DEBUG' ) ) {
 	define( 'WMSD_DEBUG', true );
 }
 
+add_action( 'woocommerce_checkout_update_order_review', 'wmsd_early_populate_overrides_from_cart', 1 );
 add_action( 'woocommerce_before_calculate_totals', 'wmsd_modify_cart', 10, 1 );
 add_action( 'admin_menu', 'wmsd_register_admin_page' );
 add_action( 'admin_post_wmsd_save_mappings', 'wmsd_handle_save_mappings' );
@@ -100,6 +101,92 @@ function wmsd_modify_cart( $cart_object ) {
 			$product->apply_changes();
 		}
 	}
+}
+
+/**
+ * Fires at priority 1 on woocommerce_checkout_update_order_review — before fast-courier's
+ * checkingQuotes (priority 10), which calls get_post_meta($product_id) to read fc_* dimensions.
+ * By pre-populating wmsd_all_overrides here, the get_post_metadata filter can intercept those
+ * reads and return the calculator-mapped values instead of the stored DB values.
+ */
+function wmsd_early_populate_overrides_from_cart() {
+	if ( ! WC()->cart || WC()->cart->is_empty() ) {
+		return;
+	}
+
+	$mappings = wmsd_get_saved_mappings();
+
+	if ( empty( $mappings ) ) {
+		return;
+	}
+
+	if ( ! isset( $GLOBALS['wmsd_all_overrides'] ) || ! is_array( $GLOBALS['wmsd_all_overrides'] ) ) {
+		$GLOBALS['wmsd_all_overrides'] = array();
+	}
+
+	foreach ( WC()->cart->get_cart() as $cart_item ) {
+		if ( empty( $cart_item['ccb_calculator'] ) || ! is_array( $cart_item['ccb_calculator'] ) ) {
+			continue;
+		}
+
+		$calculator_data = $cart_item['ccb_calculator'];
+
+		if ( empty( $calculator_data['calc_data'] ) ) {
+			continue;
+		}
+
+		$calculator_id = wmsd_get_calculator_id_from_cart_item( $calculator_data );
+
+		if ( ! $calculator_id || empty( $mappings[ $calculator_id ] ) ) {
+			continue;
+		}
+
+		$product_ids = array_unique( array_filter( array(
+			! empty( $cart_item['product_id'] ) ? absint( $cart_item['product_id'] ) : 0,
+			! empty( $cart_item['variation_id'] ) ? absint( $cart_item['variation_id'] ) : 0,
+		) ) );
+
+		if ( empty( $product_ids ) && ! empty( $cart_item['data'] ) && is_object( $cart_item['data'] ) ) {
+			$p          = $cart_item['data'];
+			$product_ids = array_unique( array_filter( array(
+				method_exists( $p, 'get_id' ) ? absint( $p->get_id() ) : 0,
+				method_exists( $p, 'get_parent_id' ) ? absint( $p->get_parent_id() ) : 0,
+			) ) );
+		}
+
+		foreach ( $mappings[ $calculator_id ] as $mapping ) {
+			$field_alias       = $mapping['field_alias'];
+			$meta_key          = $mapping['meta_key'];
+			$target_product_id = isset( $mapping['product_id'] ) ? absint( $mapping['product_id'] ) : 0;
+
+			if ( '' === $meta_key ) {
+				continue;
+			}
+
+			if ( $target_product_id && ! in_array( $target_product_id, $product_ids, true ) ) {
+				continue;
+			}
+
+			if ( empty( $calculator_data['calc_data'][ $field_alias ] ) ) {
+				continue;
+			}
+
+			$value = wmsd_extract_mapped_value( $calculator_data['calc_data'][ $field_alias ] );
+
+			if ( null === $value ) {
+				continue;
+			}
+
+			foreach ( $product_ids as $pid ) {
+				if ( ! isset( $GLOBALS['wmsd_all_overrides'][ $pid ] ) ) {
+					$GLOBALS['wmsd_all_overrides'][ $pid ] = array();
+				}
+				$GLOBALS['wmsd_all_overrides'][ $pid ][ $meta_key ] = $value;
+			}
+		}
+	}
+
+	wmsd_log( 'Early-populated shipping overrides from cart', array( 'overrides' => $GLOBALS['wmsd_all_overrides'] ) );
 }
 
 function wmsd_extract_mapped_value( $field_data ) {
