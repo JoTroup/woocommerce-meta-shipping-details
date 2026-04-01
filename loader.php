@@ -17,6 +17,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'WMSD_OPTION_MAPPINGS', 'wmsd_calculator_mappings' );
 define( 'WMSD_ADMIN_SLUG', 'wmsd-field-mappings' );
 
+if ( ! defined( 'WMSD_DEBUG' ) ) {
+	define( 'WMSD_DEBUG', true );
+}
+
 add_action( 'woocommerce_before_calculate_totals', 'wmsd_modify_cart', 10, 1 );
 add_action( 'admin_menu', 'wmsd_register_admin_page' );
 add_action( 'admin_post_wmsd_save_mappings', 'wmsd_handle_save_mappings' );
@@ -43,6 +47,7 @@ function wmsd_modify_cart( $cart_object ) {
 
 		$calculator_data = $cart_item['ccb_calculator'];
 		$calculator_id   = wmsd_get_calculator_id_from_cart_item( $calculator_data );
+		$cart_item_key   = isset( $cart_item['key'] ) ? (string) $cart_item['key'] : '';
 
 		if ( ! $calculator_id || empty( $mappings[ $calculator_id ] ) || empty( $calculator_data['calc_data'] ) || ! is_array( $calculator_data['calc_data'] ) ) {
 			continue;
@@ -77,6 +82,18 @@ function wmsd_modify_cart( $cart_object ) {
 			}
 
 			$product->update_meta_data( $meta_key, $value );
+
+			wmsd_log(
+				'Mapped cart value onto product meta',
+				array(
+					'cart_item_key' => $cart_item_key,
+					'calculator_id' => $calculator_id,
+					'field_alias'   => $field_alias,
+					'meta_key'      => $meta_key,
+					'product_ids'   => $product_ids,
+					'value'         => $value,
+				)
+			);
 		}
 
 		if ( method_exists( $product, 'get_changes' ) && method_exists( $product, 'apply_changes' ) && ! empty( $product->get_changes() ) ) {
@@ -148,6 +165,7 @@ function wmsd_attach_shipping_meta_overrides( $packages ) {
 			}
 
 			$calculator_id = wmsd_get_calculator_id_from_cart_item( $item['ccb_calculator'] );
+			$cart_item_key = isset( $item['key'] ) ? (string) $item['key'] : '';
 
 			if ( ! $calculator_id || empty( $mappings[ $calculator_id ] ) ) {
 				continue;
@@ -173,25 +191,56 @@ function wmsd_attach_shipping_meta_overrides( $packages ) {
 					}
 
 					$overrides[ $product_id ][ $meta_key ] = $value;
+
+					wmsd_log(
+						'Prepared shipping meta override from cart product',
+						array(
+							'package_index'      => $package_index,
+							'cart_item_key'      => $cart_item_key,
+							'calculator_id'      => $calculator_id,
+							'product_id'         => $product_id,
+							'target_product_id'  => $target_product_id,
+							'meta_key'           => $meta_key,
+							'value'              => $value,
+						)
+					);
 				}
 			}
 		}
 
 		$packages[ $package_index ]['wmsd_meta_overrides'] = $overrides;
+
+		wmsd_log(
+			'Built package shipping overrides',
+			array(
+				'package_index' => $package_index,
+				'overrides'     => $overrides,
+			)
+		);
 	}
 
 	return $packages;
 }
 
 function wmsd_enable_shipping_override_context( $package, $shipping_method ) {
-	unset( $shipping_method );
+	$shipping_method_id = is_object( $shipping_method ) && method_exists( $shipping_method, 'get_method_id' ) ? $shipping_method->get_method_id() : '';
 
 	$GLOBALS['wmsd_shipping_override_active'] = true;
 	$GLOBALS['wmsd_shipping_override_map']    = ( ! empty( $package['wmsd_meta_overrides'] ) && is_array( $package['wmsd_meta_overrides'] ) ) ? $package['wmsd_meta_overrides'] : array();
+
+	wmsd_log(
+		'Enabled shipping override context',
+		array(
+			'shipping_method_id' => $shipping_method_id,
+			'override_products'  => array_keys( $GLOBALS['wmsd_shipping_override_map'] ),
+		)
+	);
 }
 
 function wmsd_disable_shipping_override_context( $package, $shipping_method ) {
 	unset( $package, $shipping_method );
+
+	wmsd_log( 'Disabled shipping override context' );
 
 	unset( $GLOBALS['wmsd_shipping_override_active'] );
 	unset( $GLOBALS['wmsd_shipping_override_map'] );
@@ -214,6 +263,15 @@ function wmsd_filter_post_metadata_for_shipping( $value, $object_id, $meta_key, 
 		if ( ! array_key_exists( $meta_key, $overrides ) ) {
 			return $value;
 		}
+
+		wmsd_log(
+			'Overrode get_post_meta value during shipping',
+			array(
+				'product_id' => $object_id,
+				'meta_key'   => $meta_key,
+				'value'      => $overrides[ $meta_key ],
+			)
+		);
 
 		return $single ? $overrides[ $meta_key ] : array( $overrides[ $meta_key ] );
 	}
@@ -238,7 +296,33 @@ function wmsd_filter_post_metadata_for_shipping( $value, $object_id, $meta_key, 
 		$meta_data[ $override_key ] = array( $override_value );
 	}
 
+	wmsd_log(
+		'Overrode full product meta array during shipping',
+		array(
+			'product_id'    => $object_id,
+			'override_keys' => array_keys( $overrides ),
+		)
+	);
+
 	return $meta_data;
+}
+
+function wmsd_log( $message, $context = array() ) {
+	if ( ! WMSD_DEBUG ) {
+		return;
+	}
+
+	$context = is_array( $context ) ? $context : array( 'context' => $context );
+
+	if ( function_exists( 'wc_get_logger' ) ) {
+		$logger = wc_get_logger();
+		$logger->debug( $message . ' ' . wp_json_encode( $context ), array( 'source' => 'wmsd' ) );
+		return;
+	}
+
+	if ( function_exists( 'error_log' ) ) {
+		error_log( '[wmsd] ' . $message . ' ' . wp_json_encode( $context ) );
+	}
 }
 
 function wmsd_get_calculator_id_from_cart_item( $calculator_data ) {
