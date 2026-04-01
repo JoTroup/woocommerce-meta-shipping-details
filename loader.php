@@ -187,13 +187,20 @@ function wmsd_early_populate_overrides_from_cart() {
 		}
 	}
 
-	// WC_Data::read_meta_data() caches loaded meta under this exact key format.
-	// Deleting it forces a fresh $wpdb read on the next new \WC_Product($id) call,
-	// which fires woocommerce_post_get_meta_data where we inject our overrides.
-	if ( class_exists( 'WC_Cache_Helper' ) ) {
-		$prefix = WC_Cache_Helper::get_cache_prefix( 'products' );
-		foreach ( array_keys( $GLOBALS['wmsd_all_overrides'] ) as $pid ) {
-			wp_cache_delete( $prefix . 'object_' . $pid, 'products' );
+	// Force-reload meta on each cart product object with our overrides already set.
+	// WC_Data::read_meta_data(true) bypasses cache, calls data_store->read_meta() which
+	// fires woocommerce_post_get_meta_data (our injection filter), then writes the
+	// overridden meta BACK into WP object cache. Any subsequent new \WC_Product($id)
+	// call by fast-courier hits that cache and receives the overridden values — no
+	// cache-key format guessing required, works across all WC versions.
+	foreach ( WC()->cart->get_cart() as $cart_item ) {
+		if ( empty( $cart_item['data'] ) || ! is_object( $cart_item['data'] ) || ! method_exists( $cart_item['data'], 'get_id' ) ) {
+			continue;
+		}
+		$p   = $cart_item['data'];
+		$pid = absint( $p->get_id() );
+		if ( $pid && ! empty( $GLOBALS['wmsd_all_overrides'][ $pid ] ) && method_exists( $p, 'read_meta_data' ) ) {
+			$p->read_meta_data( true );
 		}
 	}
 
