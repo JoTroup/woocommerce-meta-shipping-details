@@ -22,6 +22,7 @@ if ( ! defined( 'WMSD_DEBUG' ) ) {
 }
 
 add_action( 'woocommerce_checkout_update_order_review', 'wmsd_early_populate_overrides_from_cart', 1 );
+add_action( 'woocommerce_product_object_read', 'wmsd_override_product_meta_on_read', 10, 1 );
 add_action( 'woocommerce_before_calculate_totals', 'wmsd_modify_cart', 10, 1 );
 add_action( 'admin_menu', 'wmsd_register_admin_page' );
 add_action( 'admin_post_wmsd_save_mappings', 'wmsd_handle_save_mappings' );
@@ -187,6 +188,38 @@ function wmsd_early_populate_overrides_from_cart() {
 	}
 
 	wmsd_log( 'Early-populated shipping overrides from cart', array( 'overrides' => $GLOBALS['wmsd_all_overrides'] ) );
+}
+
+/**
+ * Fires when WooCommerce finishes loading a product object from the database.
+ * WC_Product::get_meta() reads from the object's in-memory $meta_data array (populated via
+ * WC_Data_Store_WP::read_meta() → direct $wpdb query, NOT through get_post_meta / WP filters).
+ * By updating the in-memory meta here, we ensure checkingQuotes sees our overridden values when
+ * it calls $product->get_meta('fc_height') etc. — without touching the database.
+ */
+function wmsd_override_product_meta_on_read( $product ) {
+	if ( empty( $GLOBALS['wmsd_all_overrides'] ) || ! is_object( $product ) || ! method_exists( $product, 'get_id' ) ) {
+		return;
+	}
+
+	$pid = absint( $product->get_id() );
+
+	if ( ! $pid || empty( $GLOBALS['wmsd_all_overrides'][ $pid ] ) ) {
+		return;
+	}
+
+	foreach ( $GLOBALS['wmsd_all_overrides'][ $pid ] as $meta_key => $meta_value ) {
+		$product->update_meta_data( $meta_key, $meta_value );
+	}
+
+	wmsd_log(
+		'Applied meta overrides to freshly-read product object',
+		array(
+			'product_id'    => $pid,
+			'override_keys' => array_keys( $GLOBALS['wmsd_all_overrides'][ $pid ] ),
+			'overrides'     => $GLOBALS['wmsd_all_overrides'][ $pid ],
+		)
+	);
 }
 
 function wmsd_extract_mapped_value( $field_data ) {
