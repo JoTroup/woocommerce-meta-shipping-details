@@ -20,6 +20,10 @@ define( 'WMSD_ADMIN_SLUG', 'wmsd-field-mappings' );
 add_action( 'woocommerce_before_calculate_totals', 'wmsd_modify_cart', 10, 1 );
 add_action( 'admin_menu', 'wmsd_register_admin_page' );
 add_action( 'admin_post_wmsd_save_mappings', 'wmsd_handle_save_mappings' );
+add_filter( 'woocommerce_cart_shipping_packages', 'wmsd_attach_shipping_meta_overrides', 20, 1 );
+add_action( 'woocommerce_before_get_rates_for_package', 'wmsd_enable_shipping_override_context', 10, 2 );
+add_action( 'woocommerce_after_get_rates_for_package', 'wmsd_disable_shipping_override_context', 10, 2 );
+add_filter( 'get_post_metadata', 'wmsd_filter_post_metadata_for_shipping', 10, 5 );
 
 function wmsd_modify_cart( $cart_object ) {
 	if ( ( is_admin() && ! defined( 'DOING_AJAX' ) ) || ! is_object( $cart_object ) || $cart_object->is_empty() ) {
@@ -101,6 +105,140 @@ function wmsd_extract_mapped_value( $field_data ) {
 	}
 
 	return $value;
+}
+
+function wmsd_attach_shipping_meta_overrides( $packages ) {
+	if ( ! is_array( $packages ) ) {
+		return $packages;
+	}
+
+	$mappings = wmsd_get_saved_mappings();
+
+	if ( empty( $mappings ) ) {
+		return $packages;
+	}
+
+	foreach ( $packages as $package_index => $package ) {
+		if ( empty( $package['contents'] ) || ! is_array( $package['contents'] ) ) {
+			continue;
+		}
+
+		$overrides = array();
+
+		foreach ( $package['contents'] as $item ) {
+			if ( empty( $item['ccb_calculator'] ) || empty( $item['data'] ) || ! is_object( $item['data'] ) ) {
+				continue;
+			}
+
+			$product = $item['data'];
+
+			if ( ! method_exists( $product, 'get_id' ) ) {
+				continue;
+			}
+
+			$product_ids = array_filter(
+				array(
+					absint( $product->get_id() ),
+					method_exists( $product, 'get_parent_id' ) ? absint( $product->get_parent_id() ) : 0,
+				)
+			);
+
+			if ( empty( $product_ids ) ) {
+				continue;
+			}
+
+			$calculator_id = wmsd_get_calculator_id_from_cart_item( $item['ccb_calculator'] );
+
+			if ( ! $calculator_id || empty( $mappings[ $calculator_id ] ) ) {
+				continue;
+			}
+
+			foreach ( $mappings[ $calculator_id ] as $mapping ) {
+				$meta_key          = $mapping['meta_key'];
+				$target_product_id = isset( $mapping['product_id'] ) ? absint( $mapping['product_id'] ) : 0;
+
+				if ( '' === $meta_key || ( $target_product_id && ! in_array( $target_product_id, $product_ids, true ) ) ) {
+					continue;
+				}
+
+				$value = $product->get_meta( $meta_key, true );
+
+				if ( '' === $value && '0' !== (string) $value ) {
+					continue;
+				}
+
+				foreach ( $product_ids as $product_id ) {
+					if ( ! isset( $overrides[ $product_id ] ) ) {
+						$overrides[ $product_id ] = array();
+					}
+
+					$overrides[ $product_id ][ $meta_key ] = $value;
+				}
+			}
+		}
+
+		$packages[ $package_index ]['wmsd_meta_overrides'] = $overrides;
+	}
+
+	return $packages;
+}
+
+function wmsd_enable_shipping_override_context( $package, $shipping_method ) {
+	unset( $shipping_method );
+
+	$GLOBALS['wmsd_shipping_override_active'] = true;
+	$GLOBALS['wmsd_shipping_override_map']    = ( ! empty( $package['wmsd_meta_overrides'] ) && is_array( $package['wmsd_meta_overrides'] ) ) ? $package['wmsd_meta_overrides'] : array();
+}
+
+function wmsd_disable_shipping_override_context( $package, $shipping_method ) {
+	unset( $package, $shipping_method );
+
+	unset( $GLOBALS['wmsd_shipping_override_active'] );
+	unset( $GLOBALS['wmsd_shipping_override_map'] );
+}
+
+function wmsd_filter_post_metadata_for_shipping( $value, $object_id, $meta_key, $single, $meta_type ) {
+	if ( 'post' !== $meta_type || empty( $GLOBALS['wmsd_shipping_override_active'] ) || empty( $GLOBALS['wmsd_shipping_override_map'] ) ) {
+		return $value;
+	}
+
+	$object_id = absint( $object_id );
+
+	if ( ! $object_id || empty( $GLOBALS['wmsd_shipping_override_map'][ $object_id ] ) ) {
+		return $value;
+	}
+
+	$overrides = $GLOBALS['wmsd_shipping_override_map'][ $object_id ];
+
+	if ( '' !== $meta_key ) {
+		if ( ! array_key_exists( $meta_key, $overrides ) ) {
+			return $value;
+		}
+
+		return $single ? $overrides[ $meta_key ] : array( $overrides[ $meta_key ] );
+	}
+
+	static $running = false;
+
+	if ( $running ) {
+		return $value;
+	}
+
+	$running = true;
+	remove_filter( 'get_post_metadata', 'wmsd_filter_post_metadata_for_shipping', 10 );
+	$meta_data = get_post_meta( $object_id );
+	add_filter( 'get_post_metadata', 'wmsd_filter_post_metadata_for_shipping', 10, 5 );
+	$running = false;
+
+	if ( ! is_array( $meta_data ) ) {
+		$meta_data = array();
+	}
+
+	foreach ( $overrides as $override_key => $override_value ) {
+		$meta_data[ $override_key ] = array( $override_value );
+	}
+
+	return $meta_data;
 }
 
 function wmsd_get_calculator_id_from_cart_item( $calculator_data ) {
