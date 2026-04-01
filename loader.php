@@ -210,6 +210,18 @@ function wmsd_attach_shipping_meta_overrides( $packages ) {
 
 		$packages[ $package_index ]['wmsd_meta_overrides'] = $overrides;
 
+		// Persist overrides into the request-level map so the get_post_metadata filter
+		// can intercept reads regardless of when fast-courier calls get_post_meta.
+		if ( ! isset( $GLOBALS['wmsd_all_overrides'] ) || ! is_array( $GLOBALS['wmsd_all_overrides'] ) ) {
+			$GLOBALS['wmsd_all_overrides'] = array();
+		}
+		foreach ( $overrides as $pid => $meta_map ) {
+			if ( ! isset( $GLOBALS['wmsd_all_overrides'][ $pid ] ) ) {
+				$GLOBALS['wmsd_all_overrides'][ $pid ] = array();
+			}
+			$GLOBALS['wmsd_all_overrides'][ $pid ] = array_merge( $GLOBALS['wmsd_all_overrides'][ $pid ], $meta_map );
+		}
+
 		wmsd_log(
 			'Built package shipping overrides',
 			array(
@@ -247,17 +259,17 @@ function wmsd_disable_shipping_override_context( $package, $shipping_method ) {
 }
 
 function wmsd_filter_post_metadata_for_shipping( $value, $object_id, $meta_key, $single ) {
-	if ( empty( $GLOBALS['wmsd_shipping_override_active'] ) || empty( $GLOBALS['wmsd_shipping_override_map'] ) ) {
+	if ( empty( $GLOBALS['wmsd_all_overrides'] ) ) {
 		return $value;
 	}
 
 	$object_id = absint( $object_id );
 
-	if ( ! $object_id || empty( $GLOBALS['wmsd_shipping_override_map'][ $object_id ] ) ) {
+	if ( ! $object_id || empty( $GLOBALS['wmsd_all_overrides'][ $object_id ] ) ) {
 		return $value;
 	}
 
-	$overrides = $GLOBALS['wmsd_shipping_override_map'][ $object_id ];
+	$overrides = $GLOBALS['wmsd_all_overrides'][ $object_id ];
 
 	if ( '' !== $meta_key ) {
 		if ( ! array_key_exists( $meta_key, $overrides ) ) {
