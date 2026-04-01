@@ -22,7 +22,7 @@ if ( ! defined( 'WMSD_DEBUG' ) ) {
 }
 
 add_action( 'woocommerce_checkout_update_order_review', 'wmsd_early_populate_overrides_from_cart', 1 );
-add_action( 'woocommerce_product_object_read', 'wmsd_override_product_meta_on_read', 10, 1 );
+add_filter( 'woocommerce_post_get_meta_data', 'wmsd_inject_overrides_into_product_read_meta', 10, 2 );
 add_action( 'woocommerce_before_calculate_totals', 'wmsd_modify_cart', 10, 1 );
 add_action( 'admin_menu', 'wmsd_register_admin_page' );
 add_action( 'admin_post_wmsd_save_mappings', 'wmsd_handle_save_mappings' );
@@ -187,39 +187,78 @@ function wmsd_early_populate_overrides_from_cart() {
 		}
 	}
 
+	// Clear WC product object cache for each overridden product so that the next
+	// new \WC_Product( $id ) call (in checkingQuotes) is forced to re-read meta from
+	// DB, which fires our woocommerce_post_get_meta_data filter below.
+	foreach ( array_keys( $GLOBALS['wmsd_all_overrides'] ) as $pid ) {
+		wp_cache_delete( $pid, 'products' );
+		wp_cache_delete( 'product-' . $pid, 'products' );
+		if ( class_exists( 'WC_Cache_Helper' ) && method_exists( 'WC_Cache_Helper', 'get_cache_prefix' ) ) {
+			wp_cache_delete(
+				WC_Cache_Helper::get_cache_prefix( 'products' ) . 'woocommerce_product_' . $pid,
+				'products'
+			);
+		}
+	}
+
 	wmsd_log( 'Early-populated shipping overrides from cart', array( 'overrides' => $GLOBALS['wmsd_all_overrides'] ) );
 }
 
 /**
- * Fires when WooCommerce finishes loading a product object from the database.
- * WC_Product::get_meta() reads from the object's in-memory $meta_data array (populated via
- * WC_Data_Store_WP::read_meta() → direct $wpdb query, NOT through get_post_meta / WP filters).
- * By updating the in-memory meta here, we ensure checkingQuotes sees our overridden values when
- * it calls $product->get_meta('fc_height') etc. — without touching the database.
+ * Hooked to woocommerce_post_get_meta_data — fires inside WC_Data_Store_WP::read_meta() which
+ * uses a direct $wpdb query (bypassing get_post_meta / WP cache). This is the ONLY reliable
+ * place to inject override values so that $product->get_meta('fc_height') returns our value
+ * rather than the stored DB value, because WC_Data::get_meta() reads from the in-memory
+ * $meta_data array that is populated exclusively from read_meta().
+ *
+ * @param array  $raw_meta Array of stdClass objects with meta_id, meta_key, meta_value.
+ * @param object $product  The WC_Product (or WC_Data) object being read.
+ * @return array Modified $raw_meta with override values injected.
  */
-function wmsd_override_product_meta_on_read( $product ) {
+function wmsd_inject_overrides_into_product_read_meta( $raw_meta, $product ) {
 	if ( empty( $GLOBALS['wmsd_all_overrides'] ) || ! is_object( $product ) || ! method_exists( $product, 'get_id' ) ) {
-		return;
+		return $raw_meta;
 	}
 
 	$pid = absint( $product->get_id() );
 
 	if ( ! $pid || empty( $GLOBALS['wmsd_all_overrides'][ $pid ] ) ) {
-		return;
+		return $raw_meta;
 	}
 
-	foreach ( $GLOBALS['wmsd_all_overrides'][ $pid ] as $meta_key => $meta_value ) {
-		$product->update_meta_data( $meta_key, $meta_value );
+	$overrides     = $GLOBALS['wmsd_all_overrides'][ $pid ];
+	$handled_keys  = array();
+
+	foreach ( $raw_meta as $index => $meta_obj ) {
+		if ( isset( $meta_obj->meta_key ) && array_key_exists( $meta_obj->meta_key, $overrides ) ) {
+			$entry             = clone $meta_obj;
+			$entry->meta_value = $overrides[ $meta_obj->meta_key ];
+			$raw_meta[ $index ] = $entry;
+			$handled_keys[]    = $meta_obj->meta_key;
+		}
+	}
+
+	// Inject keys that did not already exist in the DB meta.
+	foreach ( $overrides as $key => $value ) {
+		if ( ! in_array( $key, $handled_keys, true ) ) {
+			$entry             = new \stdClass();
+			$entry->meta_id    = 0;
+			$entry->meta_key   = $key;
+			$entry->meta_value = $value;
+			$raw_meta[]        = $entry;
+		}
 	}
 
 	wmsd_log(
-		'Applied meta overrides to freshly-read product object',
+		'Injected overrides into product meta at read_meta level',
 		array(
 			'product_id'    => $pid,
-			'override_keys' => array_keys( $GLOBALS['wmsd_all_overrides'][ $pid ] ),
-			'overrides'     => $GLOBALS['wmsd_all_overrides'][ $pid ],
+			'override_keys' => array_keys( $overrides ),
+			'overrides'     => $overrides,
 		)
 	);
+
+	return $raw_meta;
 }
 
 function wmsd_extract_mapped_value( $field_data ) {
