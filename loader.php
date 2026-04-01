@@ -23,7 +23,7 @@ add_action( 'admin_post_wmsd_save_mappings', 'wmsd_handle_save_mappings' );
 add_filter( 'woocommerce_cart_shipping_packages', 'wmsd_attach_shipping_meta_overrides', 20, 1 );
 add_action( 'woocommerce_before_get_rates_for_package', 'wmsd_enable_shipping_override_context', 10, 2 );
 add_action( 'woocommerce_after_get_rates_for_package', 'wmsd_disable_shipping_override_context', 10, 2 );
-add_filter( 'get_post_metadata', 'wmsd_filter_post_metadata_for_shipping', 10, 5 );
+add_filter( 'get_post_metadata', 'wmsd_filter_post_metadata_for_shipping', 10, 4 );
 
 function wmsd_modify_cart( $cart_object ) {
 	if ( ( is_admin() && ! defined( 'DOING_AJAX' ) ) || ! is_object( $cart_object ) || $cart_object->is_empty() ) {
@@ -197,8 +197,8 @@ function wmsd_disable_shipping_override_context( $package, $shipping_method ) {
 	unset( $GLOBALS['wmsd_shipping_override_map'] );
 }
 
-function wmsd_filter_post_metadata_for_shipping( $value, $object_id, $meta_key, $single, $meta_type ) {
-	if ( 'post' !== $meta_type || empty( $GLOBALS['wmsd_shipping_override_active'] ) || empty( $GLOBALS['wmsd_shipping_override_map'] ) ) {
+function wmsd_filter_post_metadata_for_shipping( $value, $object_id, $meta_key, $single ) {
+	if ( empty( $GLOBALS['wmsd_shipping_override_active'] ) || empty( $GLOBALS['wmsd_shipping_override_map'] ) ) {
 		return $value;
 	}
 
@@ -227,7 +227,7 @@ function wmsd_filter_post_metadata_for_shipping( $value, $object_id, $meta_key, 
 	$running = true;
 	remove_filter( 'get_post_metadata', 'wmsd_filter_post_metadata_for_shipping', 10 );
 	$meta_data = get_post_meta( $object_id );
-	add_filter( 'get_post_metadata', 'wmsd_filter_post_metadata_for_shipping', 10, 5 );
+	add_filter( 'get_post_metadata', 'wmsd_filter_post_metadata_for_shipping', 10, 4 );
 	$running = false;
 
 	if ( ! is_array( $meta_data ) ) {
